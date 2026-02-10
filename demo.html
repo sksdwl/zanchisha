@@ -1,0 +1,490 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>🍜 咱吃啥 - AI 智能推荐</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+    .animate-spin {
+      animation: spin 1s linear infinite;
+    }
+  </style>
+</head>
+<body class="bg-gray-50">
+  <!-- 导航栏 -->
+  <nav class="bg-white/80 backdrop-blur-md border-b border-gray-100 sticky top-0 z-50">
+    <div class="max-w-6xl mx-auto px-4 py-4 flex items-center justify-between">
+      <div class="flex items-center gap-2">
+        <span class="text-2xl">🍜</span>
+        <span class="font-bold text-gray-800 text-lg">咱吃啥</span>
+      </div>
+      <button id="loginBtn" class="px-4 py-2 bg-gradient-to-r from-blue-500 to-purple-600 text-white rounded-lg text-sm font-medium shadow-md hover:shadow-lg transition-all">
+        SecondMe 登录
+      </button>
+      <button id="logoutBtn" class="hidden px-4 py-2 bg-gray-100 text-gray-700 rounded-lg text-sm hover:bg-gray-200 transition-colors">
+        退出登录
+      </button>
+    </div>
+  </nav>
+
+  <!-- 登录前页面 -->
+  <div id="landingPage" class="max-w-4xl mx-auto px-4 py-16 text-center">
+    <div class="text-8xl mb-6">🍜🤔🍱</div>
+    <h1 class="text-4xl md:text-5xl font-bold text-gray-800 mb-6">
+      今天吃啥？
+      <br>
+      <span class="text-orange-500">AI 来帮你决定</span>
+    </h1>
+    <p class="text-xl text-gray-600 mb-8 max-w-2xl mx-auto">
+      和好友聚餐总是众口难调？上传你们喜欢的菜品，
+      AI 智能分析群体口味，推荐最合适的餐厅
+    </p>
+    <button id="startBtn" class="px-8 py-4 bg-orange-500 hover:bg-orange-600 text-white text-lg font-medium rounded-xl shadow-lg hover:shadow-xl transition-all">
+      开始使用
+    </button>
+
+    <!-- 功能介绍 -->
+    <div class="grid md:grid-cols-3 gap-8 mt-16">
+      <div class="bg-white rounded-2xl p-6 shadow-sm">
+        <div class="text-4xl mb-4">📝</div>
+        <h3 class="text-lg font-bold text-gray-800 mb-2">1. 输入菜品</h3>
+        <p class="text-gray-600 text-sm">每人上传自己喜欢的菜品，每行一道</p>
+      </div>
+      <div class="bg-white rounded-2xl p-6 shadow-sm">
+        <div class="text-4xl mb-4">🤖</div>
+        <h3 class="text-lg font-bold text-gray-800 mb-2">2. AI 分析</h3>
+        <p class="text-gray-600 text-sm">SecondMe AI 自动分析口味画像</p>
+      </div>
+      <div class="bg-white rounded-2xl p-6 shadow-sm">
+        <div class="text-4xl mb-4">🎯</div>
+        <h3 class="text-lg font-bold text-gray-800 mb-2">3. 获取推荐</h3>
+        <p class="text-gray-600 text-sm">智能匹配群体口味，推荐餐厅</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- 主应用页面 -->
+  <div id="appPage" class="hidden max-w-6xl mx-auto px-4 py-8">
+    <!-- 步骤指示 -->
+    <div class="flex justify-center gap-8 mb-8 text-sm text-gray-500">
+      <div class="flex items-center gap-2">
+        <span class="w-6 h-6 bg-orange-500 text-white rounded-full flex items-center justify-center text-xs font-medium">1</span>
+        输入喜欢的菜品
+      </div>
+      <div class="flex items-center gap-2">
+        <span class="w-6 h-6 bg-orange-500 text-white rounded-full flex items-center justify-center text-xs font-medium">2</span>
+        AI 分析口味画像
+      </div>
+      <div class="flex items-center gap-2">
+        <span class="w-6 h-6 bg-orange-500 text-white rounded-full flex items-center justify-center text-xs font-medium">3</span>
+        获取群体推荐
+      </div>
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <!-- 左侧：用户输入区 -->
+      <div class="lg:col-span-2 space-y-4">
+        <div class="flex items-center justify-between">
+          <h2 class="text-lg font-medium text-gray-800">参与用户 (<span id="userCount">1</span>)</h2>
+          <button id="addUserBtn" class="flex items-center gap-1 px-3 py-1.5 text-sm text-orange-600 hover:bg-orange-50 rounded-lg transition-colors">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+            </svg>
+            添加好友
+          </button>
+        </div>
+        <div id="userCards" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <!-- 用户卡片会动态插入这里 -->
+        </div>
+        
+        <!-- 示例数据按钮 -->
+        <div class="mt-6 text-center">
+          <button id="loadDemoBtn" class="text-sm text-gray-500 hover:text-orange-600 underline">
+            加载示例数据（演示用）
+          </button>
+        </div>
+      </div>
+
+      <!-- 右侧：群体结果 -->
+      <div class="lg:col-span-1">
+        <div class="sticky top-24" id="groupResult">
+          <div class="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl p-6 text-center">
+            <div class="text-4xl mb-3">👥</div>
+            <h3 class="text-lg font-medium text-gray-800 mb-1">等待更多用户</h3>
+            <p class="text-sm text-gray-500">至少需要 2 位用户完成 AI 分析</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // ============ 状态管理 ============
+    let users = [{ id: '1', name: '我', dishes: '', profile: null }];
+    let isLoggedIn = false;
+    let userCounter = 1;
+
+    // ============ DOM 元素 ============
+    const landingPage = document.getElementById('landingPage');
+    const appPage = document.getElementById('appPage');
+    const loginBtn = document.getElementById('loginBtn');
+    const logoutBtn = document.getElementById('logoutBtn');
+    const startBtn = document.getElementById('startBtn');
+    const userCards = document.getElementById('userCards');
+    const userCount = document.getElementById('userCount');
+    const addUserBtn = document.getElementById('addUserBtn');
+    const loadDemoBtn = document.getElementById('loadDemoBtn');
+    const groupResult = document.getElementById('groupResult');
+
+    // ============ 事件监听 ============
+    loginBtn.addEventListener('click', () => {
+      isLoggedIn = true;
+      loginBtn.classList.add('hidden');
+      logoutBtn.classList.remove('hidden');
+      alert('登录成功！（演示模式）');
+    });
+
+    logoutBtn.addEventListener('click', () => {
+      isLoggedIn = false;
+      loginBtn.classList.remove('hidden');
+      logoutBtn.classList.add('hidden');
+      showLanding();
+    });
+
+    startBtn.addEventListener('click', () => {
+      if (!isLoggedIn) {
+        alert('请先登录后再使用！');
+        return;
+      }
+      showApp();
+    });
+
+    addUserBtn.addEventListener('click', addUser);
+    loadDemoBtn.addEventListener('click', loadDemoData);
+
+    // ============ 页面切换 ============
+    function showLanding() {
+      landingPage.classList.remove('hidden');
+      appPage.classList.add('hidden');
+    }
+
+    function showApp() {
+      landingPage.classList.add('hidden');
+      appPage.classList.remove('hidden');
+      renderUserCards();
+    }
+
+    // ============ 用户卡片渲染 ============
+    function renderUserCards() {
+      userCards.innerHTML = '';
+      userCount.textContent = users.length;
+      
+      users.forEach(user => {
+        const card = createUserCard(user);
+        userCards.appendChild(card);
+      });
+      
+      updateGroupResult();
+    }
+
+    function createUserCard(user) {
+      const div = document.createElement('div');
+      div.className = 'bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden';
+      
+      if (!user.profile) {
+        // 输入模式
+        div.innerHTML = `
+          <div class="px-4 py-3 bg-gradient-to-r from-orange-50 to-amber-50 border-b border-gray-100 flex items-center justify-between">
+            <input type="text" value="${user.name}" 
+              class="bg-transparent font-medium text-gray-800 focus:outline-none focus:ring-2 focus:ring-orange-300 rounded px-1"
+              onchange="updateUserName('${user.id}', this.value)">
+            ${users.length > 1 ? `<button onclick="removeUser('${user.id}')" class="text-gray-400 hover:text-red-500">✕</button>` : ''}
+          </div>
+          <div class="p-4">
+            <textarea 
+              class="w-full h-40 p-3 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-orange-500 resize-none"
+              placeholder="输入你喜欢的菜品，每行一道：\n宫保鸡丁\n麻婆豆腐\n水煮鱼\n..."
+              onchange="updateUserDishes('${user.id}', this.value)"
+            >${user.dishes}</textarea>
+            <div class="mt-3 flex items-center justify-between">
+              <span class="text-xs text-gray-500">${user.dishes.split('\n').filter(d => d.trim()).length} 道菜</span>
+              <button onclick="analyzeUser('${user.id}')" 
+                class="px-4 py-2 bg-orange-500 hover:bg-orange-600 text-white rounded-lg text-sm font-medium shadow-md">
+                AI 分析
+              </button>
+            </div>
+          </div>
+        `;
+      } else {
+        // 结果展示模式
+        const p = user.profile;
+        div.innerHTML = `
+          <div class="px-4 py-3 bg-gradient-to-r from-orange-50 to-amber-50 border-b border-gray-100">
+            <span class="font-medium text-gray-800">${user.name}</span>
+          </div>
+          <div class="p-4 space-y-4">
+            ${createRadarSvg(p.taste_profile)}
+            <div class="space-y-2">
+              ${createTasteBar('辣', p.taste_profile.spicy, '#ef4444')}
+              ${createTasteBar('麻', p.taste_profile.numbing, '#a855f7')}
+              ${createTasteBar('甜', p.taste_profile.sweet, '#f97316')}
+              ${createTasteBar('咸', p.taste_profile.salty, '#3b82f6')}
+            </div>
+            <div class="pt-3 border-t border-gray-100">
+              <p class="text-xs text-gray-500 mb-2">偏好菜系</p>
+              <div class="flex flex-wrap gap-2">
+                ${p.preferred_cuisines.map(c => `
+                  <span class="px-2 py-1 bg-orange-100 text-orange-700 text-xs rounded-full">
+                    ${c.name} ${(c.weight * 100).toFixed(0)}%
+                  </span>
+                `).join('')}
+              </div>
+            </div>
+            <button onclick="resetUser('${user.id}')" 
+              class="w-full py-2 text-sm text-gray-500 hover:text-orange-600 border-t border-gray-100 pt-3">
+              重新编辑
+            </button>
+          </div>
+        `;
+      }
+      
+      return div;
+    }
+
+    // ============ 雷达图 ============
+    function createRadarSvg(taste) {
+      const size = 120;
+      const center = size / 2;
+      const radius = size * 0.35;
+      const labels = ['辣', '甜', '咸', '酸', '麻'];
+      const values = [taste.spicy, taste.sweet, taste.salty, taste.sour, taste.numbing];
+      
+      const getPoint = (i, val) => {
+        const angle = (Math.PI * 2 * i) / 5 - Math.PI / 2;
+        const r = val * radius;
+        return { x: center + r * Math.cos(angle), y: center + r * Math.sin(angle) };
+      };
+      
+      const points = values.map((v, i) => getPoint(i, v));
+      const pathD = points.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x} ${p.y}`).join(' ') + ' Z';
+      
+      const gridPoints = [0.2, 0.4, 0.6, 0.8, 1].map(scale => 
+        labels.map((_, i) => {
+          const p = getPoint(i, scale);
+          return `${p.x},${p.y}`;
+        }).join(' ')
+      );
+      
+      const axisLines = labels.map((_, i) => {
+        const p = getPoint(i, 1);
+        return `<line x1="${center}" y1="${center}" x2="${p.x}" y2="${p.y}" stroke="#e5e7eb" stroke-width="1"/>`;
+      }).join('');
+      
+      const labelTexts = labels.map((label, i) => {
+        const p = getPoint(i, 1.2);
+        return `<text x="${p.x}" y="${p.y}" text-anchor="middle" font-size="10" fill="#6b7280">${label}</text>`;
+      }).join('');
+      
+      return `
+        <svg width="${size}" height="${size}" class="mx-auto">
+          ${gridPoints.map(p => `<polygon points="${p}" fill="none" stroke="#e5e7eb" stroke-width="1"/>`).join('')}
+          ${axisLines}
+          <path d="${pathD}" fill="rgba(249, 115, 22, 0.3)" stroke="#f97316" stroke-width="2"/>
+          ${labelTexts}
+        </svg>
+      `;
+    }
+
+    function createTasteBar(label, value, color) {
+      return `
+        <div class="flex items-center gap-2 text-sm">
+          <span class="w-8 text-gray-600">${label}</span>
+          <div class="flex-1 h-2 bg-gray-200 rounded-full overflow-hidden">
+            <div class="h-full rounded-full transition-all duration-500" 
+              style="width: ${value * 100}%; background-color: ${color}"></div>
+          </div>
+          <span class="w-10 text-right text-gray-500">${(value * 100).toFixed(0)}%</span>
+        </div>
+      `;
+    }
+
+    // ============ 用户操作 ============
+    function addUser() {
+      userCounter++;
+      users.push({ 
+        id: String(userCounter), 
+        name: `好友 ${userCounter}`, 
+        dishes: '', 
+        profile: null 
+      });
+      renderUserCards();
+    }
+
+    function removeUser(id) {
+      users = users.filter(u => u.id !== id);
+      renderUserCards();
+    }
+
+    function updateUserName(id, name) {
+      const user = users.find(u => u.id === id);
+      if (user) user.name = name;
+    }
+
+    function updateUserDishes(id, dishes) {
+      const user = users.find(u => u.id === id);
+      if (user) user.dishes = dishes;
+    }
+
+    function resetUser(id) {
+      const user = users.find(u => u.id === id);
+      if (user) user.profile = null;
+      renderUserCards();
+    }
+
+    // ============ AI 分析（Mock） ============
+    async function analyzeUser(id) {
+      const user = users.find(u => u.id === id);
+      if (!user || !user.dishes.trim()) {
+        alert('请先输入菜品！');
+        return;
+      }
+
+      const btn = event.target;
+      btn.innerHTML = '<span class="flex items-center gap-2"><svg class="animate-spin h-4 w-4" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" fill="none"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"/></svg>AI 分析中...</span>';
+      btn.disabled = true;
+
+      // 模拟 API 延迟
+      await new Promise(r => setTimeout(r, 1500));
+
+      const dishes = user.dishes.split('\n').filter(d => d.trim());
+      const hasSichuan = dishes.some(d => /宫保|宫爆|麻婆|水煮|辣子|回锅/.test(d));
+      const hasJapanese = dishes.some(d => /寿司|刺身|拉面|天妇罗/.test(d));
+      
+      const mainCuisine = hasSichuan ? '川菜' : hasJapanese ? '日料' : '家常菜';
+      
+      user.profile = {
+        preferred_cuisines: [{ name: mainCuisine, weight: 0.8 }, { name: '家常菜', weight: 0.2 }],
+        taste_profile: {
+          spicy: hasSichuan ? 0.8 : 0.2,
+          sweet: 0.3,
+          salty: 0.5,
+          sour: hasSichuan ? 0.3 : 0.2,
+          numbing: hasSichuan ? 0.6 : 0.1,
+        },
+        normalized_dishes: dishes.map(d => ({
+          original: d,
+          standard: d.replace('宫爆', '宫保'),
+          cuisine: mainCuisine,
+          aliases: d.includes('宫爆') ? ['宫保鸡丁'] : []
+        }))
+      };
+
+      renderUserCards();
+    }
+
+    // ============ 群体匹配 ============
+    function updateGroupResult() {
+      const analyzed = users.filter(u => u.profile);
+      
+      if (analyzed.length < 2) {
+        groupResult.innerHTML = `
+          <div class="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl p-6 text-center">
+            <div class="text-4xl mb-3">👥</div>
+            <h3 class="text-lg font-medium text-gray-800 mb-1">等待更多用户</h3>
+            <p class="text-sm text-gray-500">至少需要 2 位用户完成 AI 分析</p>
+          </div>
+        `;
+        return;
+      }
+
+      // 计算共同菜系
+      const cuisineCount = {};
+      analyzed.forEach(u => {
+        u.profile.preferred_cuisines.forEach(c => {
+          cuisineCount[c.name] = (cuisineCount[c.name] || 0) + 1;
+        });
+      });
+      
+      const threshold = analyzed.length * 0.5;
+      const commonCuisines = Object.entries(cuisineCount)
+        .filter(([_, count]) => count >= threshold)
+        .map(([name]) => name);
+
+      // 计算平均口味
+      const avgTaste = {
+        spicy: analyzed.reduce((sum, u) => sum + u.profile.taste_profile.spicy, 0) / analyzed.length,
+        sweet: analyzed.reduce((sum, u) => sum + u.profile.taste_profile.sweet, 0) / analyzed.length,
+        salty: analyzed.reduce((sum, u) => sum + u.profile.taste_profile.salty, 0) / analyzed.length,
+        numbing: analyzed.reduce((sum, u) => sum + u.profile.taste_profile.numbing, 0) / analyzed.length,
+      };
+
+      groupResult.innerHTML = `
+        <div class="bg-gradient-to-br from-orange-50 to-amber-50 rounded-xl p-6">
+          <h3 class="text-lg font-medium text-gray-800 mb-4 flex items-center gap-2">
+            <span class="text-2xl">🎯</span>
+            群体匹配结果
+            <span class="text-sm font-normal text-gray-500">(${analyzed.length} 人)</span>
+          </h3>
+          
+          <div class="mb-4">
+            <p class="text-sm text-gray-600 mb-2">共同偏好菜系</p>
+            ${commonCuisines.length ? `
+              <div class="flex flex-wrap gap-2">
+                ${commonCuisines.map(c => `
+                  <span class="px-3 py-1.5 bg-white text-orange-700 text-sm font-medium rounded-lg shadow-sm">${c}</span>
+                `).join('')}
+              </div>
+            ` : '<p class="text-sm text-gray-500 italic">暂无共同菜系 😅</p>'}
+          </div>
+          
+          <div class="mb-4">
+            <p class="text-sm text-gray-600 mb-2">群体平均口味</p>
+            <div class="bg-white rounded-lg p-3 space-y-2">
+              ${createTasteBar('辣', avgTaste.spicy, '#ef4444')}
+              ${createTasteBar('麻', avgTaste.numbing, '#a855f7')}
+              ${createTasteBar('甜', avgTaste.sweet, '#f97316')}
+            </div>
+          </div>
+          
+          <div class="bg-white rounded-lg p-4">
+            <p class="text-sm font-medium text-gray-800 mb-2">💡 推荐策略</p>
+            ${commonCuisines.length > 0 ? `
+              <p class="text-sm text-gray-600">
+                推荐 <span class="font-medium text-orange-600">${commonCuisines[0]}</span> 餐厅
+              </p>
+              <p class="text-xs text-gray-500 mt-1">大多数人都喜欢 ${commonCuisines[0]}，匹配度最高</p>
+            ` : `
+              <div class="space-y-2 text-sm text-gray-600">
+                <p>口味差异较大，建议：</p>
+                <ul class="space-y-1 text-xs text-gray-500 list-disc list-inside">
+                  <li>选择融合菜系餐厅（创意中餐、亚洲融合菜）</li>
+                  <li>选择自助餐厅，各自选择喜欢的食物</li>
+                  <li>火锅（不同锅底+各种食材，兼容所有人）</li>
+                </ul>
+              </div>
+            `}
+          </div>
+        </div>
+      `;
+    }
+
+    // ============ 示例数据 ============
+    function loadDemoData() {
+      users = [
+        { id: '1', name: '小明', dishes: '宫保鸡丁\n麻婆豆腐\n水煮鱼\n宫爆鸡丁\n辣子鸡\n回锅肉\n酸菜鱼\n毛血旺\n口水鸡\n鱼香肉丝', profile: null },
+        { id: '2', name: '小红', dishes: '糖醋排骨\n红烧肉\n清蒸鱼\n白切鸡\n西红柿炒蛋\n可乐鸡翅\n土豆牛腩\n地三鲜\n木须肉\n炒青菜', profile: null },
+        { id: '3', name: '小李', dishes: '寿司\n刺身\n拉面\n天妇罗\n烤鳗鱼\n寿喜烧\n炸鸡\n乌冬面\n咖喱饭\n猪排饭', profile: null },
+      ];
+      userCounter = 3;
+      renderUserCards();
+    }
+
+    // 初始化
+    renderUserCards();
+  </script>
+</body>
+</html>

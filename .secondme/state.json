@@ -1,0 +1,68 @@
+{
+  "version": "1.0",
+  "stage": "init",
+  "app_name": "咱吃啥",
+  "modules": ["auth", "profile", "chat", "act", "note"],
+  "config": {
+    "client_id": "f4e8b6b0-3dc5-453f-a85c-16616323a973",
+    "client_secret": "8535d0dcfddf7226c7ea4cf88e351e872285c89f693cc5147c408d3e1a8ec7ad",
+    "redirect_uri": "http://localhost:3000/api/auth/callback",
+    "redirect_uris": [
+      "http://localhost:3000/api/auth/callback"
+    ],
+    "database_url": "file:./dev.db",
+    "allowed_scopes": ["user.info", "user.info.shades", "user.info.softmemory", "chat", "note.add", "voice"]
+  },
+  "api": {
+    "base_url": "https://app.mindos.com/gate/lab",
+    "oauth_url": "https://go.second.me/oauth/",
+    "token_endpoint": "https://app.mindos.com/gate/lab/api/oauth/token",
+    "access_token_ttl": 7200,
+    "refresh_token_ttl": 2592000
+  },
+  "docs": {
+    "quickstart": "https://develop-docs.second.me/zh/docs",
+    "oauth2": "https://develop-docs.second.me/zh/docs/authentication/oauth2",
+    "api_reference": "https://develop-docs.second.me/zh/docs/api-reference/secondme",
+    "errors": "https://develop-docs.second.me/zh/docs/errors"
+  },
+  "prd": {
+    "core_features": {
+      "ai_dish_analyzer": {
+        "status": "completed",
+        "description": "AI 语义分析用户上传的菜品列表，提取口味画像",
+        "files": [
+          "lib/ai-dish-analyzer.ts",
+          "app/(pages)/dish-analyzer/page.tsx"
+        ]
+      },
+      "group_matching": {
+        "status": "completed",
+        "description": "合并多个用户口味画像，找出共同偏好",
+        "files": [
+          "lib/ai-dish-analyzer.ts"
+        ]
+      },
+      "frontend_ui": {
+        "status": "completed",
+        "description": "用户输入菜品、展示 AI 分析结果、群体匹配推荐",
+        "files": [
+          "app/(pages)/dish-analyzer/page.tsx"
+        ],
+        "components": [
+          "UserCard - 用户输入/结果卡片",
+          "TasteRadar - 口味雷达图",
+          "TasteBar - 口味条",
+          "GroupResult - 群体匹配结果"
+        ]
+      }
+    },
+    "next_steps": [
+      "✅ 接入真实 SecondMe API（已完成基础架构，需配置 API Key）",
+      "✅ 添加 OAuth 用户认证（已完成登录/登出功能）",
+      "接入大众点评 API 进行商家匹配",
+      "添加历史记录和数据持久化",
+      "部署上线"
+    ]
+  }
+}
