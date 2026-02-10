@@ -73,52 +73,60 @@ ${dishes.map((d, i) => `${i + 1}. ${d}`).join('\n')}
  * 调用 SecondMe Chat API
  */
 async function callSecondMeAPI(prompt: string): Promise<any> {
-  // 方式1: 使用 Chat API（如果 API Key 可用）
-  if (SECONDME_API_KEY) {
-    const response = await fetch(`${SECONDME_API_BASE}/api/chat/completions`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${SECONDME_API_KEY}`,
-      },
-      body: JSON.stringify({
-        model: 'default',
-        messages: [
-          { role: 'system', content: '你是一个专业的美食 AI 分析师。' },
-          { role: 'user', content: prompt }
-        ],
-        temperature: 0.3,
-      }),
-    });
-
-    if (!response.ok) {
-      throw new Error(`SecondMe API 错误: ${response.status}`);
-    }
-
-    const result = await response.json();
-    
-    // 解析 AI 返回的内容
-    const content = result.choices?.[0]?.message?.content;
-    if (!content) {
-      throw new Error('API 返回数据格式错误');
-    }
-
-    // 尝试解析 JSON
+  // 方式1: 使用 Chat API（如果 API Key 可用且不是占位符）
+  if (SECONDME_API_KEY && SECONDME_API_KEY !== 'your_api_key_here') {
     try {
-      return JSON.parse(content);
-    } catch {
-      // 如果返回的不是纯 JSON，尝试提取 JSON 部分
-      const jsonMatch = content.match(/\{[\s\S]*\}/);
-      if (jsonMatch) {
-        return JSON.parse(jsonMatch[0]);
+      const response = await fetch(`${SECONDME_API_BASE}/api/chat/completions`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${SECONDME_API_KEY}`,
+        },
+        body: JSON.stringify({
+          model: 'default',
+          messages: [
+            { role: 'system', content: '你是一个专业的美食 AI 分析师。' },
+            { role: 'user', content: prompt }
+          ],
+          temperature: 0.3,
+        }),
+      });
+
+      if (!response.ok) {
+        // API 请求失败，返回 null 让上层使用 mock
+        console.warn(`SecondMe API 返回错误: ${response.status}，使用模拟数据`);
+        return null;
       }
-      throw new Error('无法解析 AI 返回的数据');
+
+      const result = await response.json();
+      
+      // 解析 AI 返回的内容
+      const content = result.choices?.[0]?.message?.content;
+      if (!content) {
+        console.warn('API 返回数据格式错误，使用模拟数据');
+        return null;
+      }
+
+      // 尝试解析 JSON
+      try {
+        return JSON.parse(content);
+      } catch {
+        // 如果返回的不是纯 JSON，尝试提取 JSON 部分
+        const jsonMatch = content.match(/\{[\s\S]*\}/);
+        if (jsonMatch) {
+          return JSON.parse(jsonMatch[0]);
+        }
+        console.warn('无法解析 AI 返回的数据，使用模拟数据');
+        return null;
+      }
+    } catch (error) {
+      console.warn('SecondMe API 调用失败，使用模拟数据:', error);
+      return null;
     }
   }
 
-  // 方式2: 使用 Act API（结构化动作）
-  // 注意：Act API 需要用户授权，这里用 session token
-  throw new Error('请配置 SECONDME_API_KEY 或使用 OAuth 授权');
+  // 没有配置 API Key 或调用失败，返回 null
+  return null;
 }
 
 /**
@@ -207,13 +215,13 @@ export async function POST(request: NextRequest) {
 
     let result;
 
-    // 如果有 API Key，调用真实 API
-    if (SECONDME_API_KEY) {
-      const prompt = buildAnalysisPrompt(cleanDishes);
-      result = await callSecondMeAPI(prompt);
-    } else {
-      // 否则使用 mock 数据
-      console.log('[Mock Mode] 使用模拟数据，配置 SECONDME_API_KEY 可调用真实 API');
+    // 尝试调用真实 API
+    const prompt = buildAnalysisPrompt(cleanDishes);
+    result = await callSecondMeAPI(prompt);
+    
+    // 如果 API 调用失败或返回 null，使用 mock 数据
+    if (!result) {
+      console.log('[Mock Mode] 使用模拟数据分析菜品');
       result = mockAnalyze(cleanDishes);
     }
 
