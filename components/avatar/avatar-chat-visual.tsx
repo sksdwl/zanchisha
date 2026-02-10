@@ -316,9 +316,51 @@ function TypingIndicator({
   );
 }
 
+// 高德地图餐厅信息类型
+interface AmapRestaurantInfo {
+  name: string;
+  address: string;
+  rating: string;
+  cost: string;
+  tel: string;
+  mapUrl: string;
+  staticMapUrl: string;
+  location: string;
+}
+
 // 推荐结果组件
 function RecommendationResult({ recommendation }: { recommendation: RestaurantRecommendation }) {
+  const [restaurant, setRestaurant] = useState<AmapRestaurantInfo | null>(null);
+  const [loading, setLoading] = useState(false);
   const priceSymbols = '¥'.repeat(recommendation.priceLevel);
+  
+  // 搜索高德地图餐厅
+  useEffect(() => {
+    const searchRestaurant = async () => {
+      setLoading(true);
+      try {
+        const response = await fetch('/api/amap/search', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ 
+            cuisine: recommendation.cuisine,
+            city: '北京' // 默认城市，可以改为从用户位置获取
+          }),
+        });
+        
+        const result = await response.json();
+        if (result.code === 0 && result.data) {
+          setRestaurant(result.data);
+        }
+      } catch (error) {
+        console.error('搜索餐厅失败:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    
+    searchRestaurant();
+  }, [recommendation.cuisine]);
   
   return (
     <div className="border-t border-gray-200 bg-gradient-to-br from-orange-50 via-amber-50 to-yellow-50 p-5">
@@ -331,26 +373,106 @@ function RecommendationResult({ recommendation }: { recommendation: RestaurantRe
       
       {/* 餐厅卡片 */}
       <div className="bg-white rounded-2xl p-5 shadow-lg border border-orange-100">
-        {/* 餐厅名称和评分 */}
-        <div className="flex items-start justify-between mb-4">
-          <div>
-            <h5 className="font-bold text-xl text-gray-800 mb-1">
-              {recommendation.restaurantName}
-            </h5>
-            <div className="flex items-center gap-2 text-sm text-gray-500">
-              <span className="px-2 py-0.5 bg-orange-100 text-orange-700 rounded-full text-xs">
-                {recommendation.cuisine}
+        {/* 高德地图真实餐厅信息 */}
+        {loading ? (
+          <div className="text-center py-8">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-orange-500 mx-auto mb-2"></div>
+            <p className="text-sm text-gray-500">正在搜索附近餐厅...</p>
+          </div>
+        ) : restaurant ? (
+          <>
+            {/* 餐厅名称和评分 */}
+            <div className="flex items-start justify-between mb-4">
+              <div className="flex-1">
+                <h5 className="font-bold text-xl text-gray-800 mb-1">
+                  {restaurant.name}
+                </h5>
+                <div className="flex items-center gap-2 text-sm text-gray-500 flex-wrap">
+                  <span className="px-2 py-0.5 bg-orange-100 text-orange-700 rounded-full text-xs">
+                    {recommendation.cuisine}
+                  </span>
+                  <span className="text-yellow-500">⭐ {restaurant.rating}</span>
+                  <span className="text-gray-400">|</span>
+                  <span>人均 ¥{restaurant.cost}</span>
+                </div>
+              </div>
+            </div>
+            
+            {/* 地图展示 */}
+            {restaurant.staticMapUrl && (
+              <div className="mb-4 rounded-xl overflow-hidden border border-gray-200">
+                <img 
+                  src={restaurant.staticMapUrl} 
+                  alt="餐厅位置"
+                  className="w-full h-40 object-cover"
+                  onError={(e) => {
+                    (e.target as HTMLImageElement).style.display = 'none';
+                  }}
+                />
+              </div>
+            )}
+            
+            {/* 地址和电话 */}
+            <div className="space-y-2 mb-4">
+              <div className="flex items-start gap-2 text-sm">
+                <span className="text-gray-400 mt-0.5">📍</span>
+                <span className="text-gray-700 flex-1">{restaurant.address}</span>
+              </div>
+              {restaurant.tel && restaurant.tel !== '暂无电话' && (
+                <div className="flex items-center gap-2 text-sm">
+                  <span className="text-gray-400">📞</span>
+                  <a 
+                    href={`tel:${restaurant.tel}`}
+                    className="text-blue-600 hover:underline"
+                  >
+                    {restaurant.tel}
+                  </a>
+                </div>
+              )}
+            </div>
+            
+            {/* 导航按钮 */}
+            <a
+              href={restaurant.mapUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="block w-full py-3 bg-gradient-to-r from-blue-500 to-blue-600 text-white text-center rounded-xl font-medium hover:from-blue-600 hover:to-blue-700 transition-all mb-4"
+            >
+              <span className="flex items-center justify-center gap-2">
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" />
+                </svg>
+                高德地图导航
               </span>
-              <span>{priceSymbols}</span>
+            </a>
+          </>
+        ) : (
+          /* 备用显示 */
+          <>
+            <div className="flex items-start justify-between mb-4">
+              <div>
+                <h5 className="font-bold text-xl text-gray-800 mb-1">
+                  {recommendation.restaurantName}
+                </h5>
+                <div className="flex items-center gap-2 text-sm text-gray-500">
+                  <span className="px-2 py-0.5 bg-orange-100 text-orange-700 rounded-full text-xs">
+                    {recommendation.cuisine}
+                  </span>
+                  <span>{priceSymbols}</span>
+                </div>
+              </div>
+              <div className="text-center">
+                <div className="text-3xl font-bold text-orange-500">
+                  {recommendation.rating}
+                </div>
+                <div className="text-xs text-gray-400">评分</div>
+              </div>
             </div>
-          </div>
-          <div className="text-center">
-            <div className="text-3xl font-bold text-orange-500">
-              {recommendation.rating}
-            </div>
-            <div className="text-xs text-gray-400">评分</div>
-          </div>
-        </div>
+            <p className="text-sm text-gray-500 text-center py-4">
+              高德地图数据加载失败，显示默认推荐
+            </p>
+          </>
+        )}
         
         {/* 推荐理由 */}
         <div className="bg-gradient-to-r from-blue-50 to-indigo-50 p-3 rounded-xl mb-4">
@@ -364,7 +486,7 @@ function RecommendationResult({ recommendation }: { recommendation: RestaurantRe
         <div className="mb-4">
           <p className="text-sm font-medium text-gray-700 mb-2">🍽️ 推荐菜品</p>
           <div className="flex flex-wrap gap-2">
-            {recommendation.dishes.map((dish, i) => (
+            {recommendation.dishes.map((dish) => (
               <span 
                 key={dish} 
                 className="px-3 py-1.5 bg-gradient-to-r from-orange-100 to-amber-100 text-orange-800 text-sm rounded-full font-medium"
@@ -375,7 +497,7 @@ function RecommendationResult({ recommendation }: { recommendation: RestaurantRe
           </div>
         </div>
         
-        {/* 适合人群和位置 */}
+        {/* 适合人群 */}
         <div className="flex items-center justify-between pt-4 border-t border-gray-100 text-sm">
           <div className="flex items-center gap-2">
             <span className="text-lg">👥</span>
@@ -383,16 +505,12 @@ function RecommendationResult({ recommendation }: { recommendation: RestaurantRe
               适合：<span className="font-medium text-gray-800">{recommendation.suitableFor.join('、')}</span>
             </span>
           </div>
-          <div className="flex items-center gap-2 text-gray-500">
-            <span>📍</span>
-            <span>{recommendation.location}</span>
-          </div>
         </div>
       </div>
       
       {/* 底部提示 */}
       <p className="text-center text-xs text-gray-400 mt-3">
-        🤖 由 AI 分身智能分析推荐 · 仅供参考
+        🤖 由 AI 分身智能分析推荐 · 商家数据来自高德地图
       </p>
     </div>
   );

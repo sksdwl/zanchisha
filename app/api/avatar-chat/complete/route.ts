@@ -27,9 +27,9 @@ export async function POST(request: NextRequest) {
     const body: RequestBody = await request.json();
     const { participants } = body;
 
-    if (!participants || participants.length < 2) {
+    if (!participants || participants.length < 1) {
       return NextResponse.json(
-        { code: 400, message: '至少需要 2 位参与者' },
+        { code: 400, message: '至少需要 1 位参与者' },
         { status: 400 }
       );
     }
@@ -103,6 +103,47 @@ function generateFullConversation(
     });
   };
 
+  // 只有一个人时的单人对话模式
+  if (participants.length === 1) {
+    const p1 = participants[0];
+    const topCuisines = p1.tasteProfile.preferred_cuisines.slice(0, 2).map(c => c.name).join('、');
+    
+    // 开场
+    addMessage(p1, 
+      `大家好！我是${p1.avatarName}，代表${p1.userName}。今天一个人吃饭也要好好对待自己！我的口味特点是${p1.avatarPersonality}。让我来想想今天吃什么好呢？`,
+      'question'
+    );
+
+    // 自我分析
+    addMessage(p1,
+      `让我分析一下：我比较喜欢的菜系是${topCuisines || '暂无偏好'}，口味上${p1.avatarPersonality}。`,
+      'suggestion'
+    );
+
+    // 考虑预算和偏好
+    const priceText = p1.tasteProfile.price_level <= 2 ? '实惠一点' : '品质好一些';
+    addMessage(p1,
+      `考虑预算的话，我想找一家${priceText}的餐厅。`,
+      'suggestion'
+    );
+
+    // 给出建议
+    const allIngredients = merged.all_ingredients.slice(0, 5).join('、') || '各种食材';
+    addMessage(p1,
+      `综合来看，我喜欢${allIngredients}这些食材。让我为你推荐一家最适合的餐厅！`,
+      'suggestion'
+    );
+
+    // 最终推荐
+    addMessage(p1,
+      `决定了！我已经分析好了你的口味偏好，推荐餐厅和菜品如下，祝你用餐愉快~`,
+      'final'
+    );
+
+    return messages;
+  }
+
+  // 多人对话模式
   // 开场
   const p1 = participants[0];
   addMessage(p1, 

@@ -102,7 +102,9 @@ export function InviteCodeInput({ onSuccess }: InviteCodeInputProps) {
         </div>
         <h2 className="text-2xl font-bold text-gray-800 mb-2">输入邀请码</h2>
         <p className="text-gray-500 text-sm">
-          请输入6位数字邀请码进入群聊
+          输入6位邀请码，AI分身将帮你推荐餐厅
+          <br />
+          一个人或多人都可以聊~
         </p>
       </div>
 

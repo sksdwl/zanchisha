@@ -25,9 +25,9 @@ export async function POST(request: NextRequest) {
     const body: RequestBody = await request.json();
     const { participants } = body;
 
-    if (!participants || participants.length < 2) {
+    if (!participants || participants.length < 1) {
       return NextResponse.json(
-        { code: 400, message: '至少需要 2 位参与者才能进行 AI 分身对话' },
+        { code: 400, message: '至少需要 1 位参与者才能进行 AI 分身对话' },
         { status: 400 }
       );
     }
