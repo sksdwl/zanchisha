@@ -17,6 +17,7 @@ interface AvatarChatVisualProps {
     tasteProfile: UserTasteProfile;
   }[];
   onClose: () => void;
+  roomName?: string;
 }
 
 // AI 分身头像颜色配置
@@ -34,7 +35,7 @@ const getParticipantColor = (index: number) => {
   return AVATAR_COLORS[index % AVATAR_COLORS.length];
 };
 
-export function AvatarChatVisual({ participants, onClose }: AvatarChatVisualProps) {
+export function AvatarChatVisual({ participants, onClose, roomName = 'AI 讨论群' }: AvatarChatVisualProps) {
   const [session, setSession] = useState<AvatarChatSession | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [visibleMessages, setVisibleMessages] = useState<number>(0);

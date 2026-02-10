@@ -46,24 +46,32 @@ export default function HomePage() {
             AI 智能分析群体口味，推荐最合适的餐厅
           </p>
 
-          {isLoggedIn ? (
+          <div className="flex flex-col sm:flex-row gap-4 justify-center">
+            {/* 群聊房间入口 */}
             <Link
-              href="/dish-analyzer"
-              className="inline-flex items-center gap-2 px-8 py-4 bg-orange-500 hover:bg-orange-600 text-white text-lg font-medium rounded-xl transition-all shadow-lg hover:shadow-xl"
+              href="/room"
+              className="inline-flex items-center gap-2 px-8 py-4 bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white text-lg font-medium rounded-xl transition-all shadow-lg hover:shadow-xl"
             >
-              <span>开始使用</span>
+              <span>🤖</span>
+              <span>进入AI群聊房间</span>
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
               </svg>
             </Link>
-          ) : (
-            <div className="space-y-4">
-              <LoginButton />
-              <p className="text-sm text-gray-500">
-                使用 SecondMe 账号快速登录
-              </p>
-            </div>
-          )}
+            
+            {/* 原来的功能入口 */}
+            <Link
+              href="/dish-analyzer"
+              className="inline-flex items-center gap-2 px-8 py-4 bg-orange-500 hover:bg-orange-600 text-white text-lg font-medium rounded-xl transition-all shadow-lg hover:shadow-xl"
+            >
+              <span>🍜</span>
+              <span>单人分析</span>
+            </Link>
+          </div>
+          
+          <p className="text-sm text-gray-500 mt-4">
+            🤖 AI群聊：输入邀请码，和好友的AI分身一起讨论吃什么
+          </p>
         </div>
 
         {/* 功能介绍 */}

@@ -47,7 +47,7 @@ export async function GET(request: NextRequest) {
     }
     
     // 用 code 换取 token
-    const tokenResponse = await fetch('https://app.mindos.com/gate/lab/api/oauth/token', {
+    const tokenResponse = await fetch('https://app.mindos.com/gate/lab/api/oauth/token/code', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/x-www-form-urlencoded',
@@ -61,21 +61,16 @@ export async function GET(request: NextRequest) {
       }),
     });
     
-    if (!tokenResponse.ok) {
-      const errorData = await tokenResponse.json().catch(() => ({}));
-      console.error('Token 请求失败:', errorData);
+    const tokenResult = await tokenResponse.json();
+    
+    if (tokenResult.code !== 0 || !tokenResult.data?.accessToken) {
+      console.error('Token 请求失败:', tokenResult);
       return NextResponse.redirect(
-        new URL(`/?error=token_request_failed`, request.url)
+        new URL(`/?error=token_request_failed&message=${encodeURIComponent(tokenResult.message || '未知错误')}`, request.url)
       );
     }
     
-    const tokenData = await tokenResponse.json();
-    
-    if (!tokenData.access_token) {
-      return NextResponse.redirect(
-        new URL('/?error=invalid_token_response', request.url)
-      );
-    }
+    const tokenData = tokenResult.data;
     
     // 创建响应，重定向到首页
     const response = NextResponse.redirect(new URL('/dish-analyzer', request.url));
@@ -84,16 +79,16 @@ export async function GET(request: NextRequest) {
     response.cookies.delete('oauth_state');
     
     // 保存 access_token 到 httpOnly cookie
-    response.cookies.set('access_token', tokenData.access_token, {
+    response.cookies.set('access_token', tokenData.accessToken, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'lax',
-      maxAge: tokenData.expires_in || 7200, // 默认 2 小时
+      maxAge: tokenData.expiresIn || 7200, // 默认 2 小时
     });
     
     // 保存 refresh_token（如果有）
-    if (tokenData.refresh_token) {
-      response.cookies.set('refresh_token', tokenData.refresh_token, {
+    if (tokenData.refreshToken) {
+      response.cookies.set('refresh_token', tokenData.refreshToken, {
         httpOnly: true,
         secure: process.env.NODE_ENV === 'production',
         sameSite: 'lax',
