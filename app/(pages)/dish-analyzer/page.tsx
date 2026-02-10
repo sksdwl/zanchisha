@@ -4,7 +4,7 @@ import React, { useState } from 'react';
 import { UserTasteProfile, TasteProfile, CuisinePreference } from '@/lib/ai-dish-analyzer';
 import { useAuth } from '@/components/auth/auth-provider';
 import { LoginButton } from '@/components/auth/login-button';
-import { AvatarChat } from '@/components/avatar/avatar-chat';
+import { AvatarChatVisual } from '@/components/avatar/avatar-chat-visual';
 
 // 用户输入数据
 interface UserInput {
@@ -389,7 +389,7 @@ const GroupResult = ({ users }: { users: UserInput[] }) => {
       {showAvatarChat && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
           <div className="w-full max-w-2xl">
-            <AvatarChat 
+            <AvatarChatVisual 
               participants={participants}
               onClose={() => setShowAvatarChat(false)}
             />
