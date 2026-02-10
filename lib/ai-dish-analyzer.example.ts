@@ -26,7 +26,7 @@ async function exampleSingleUser() {
   ];
 
   try {
-    const profileA = await analyzeDishes('user_a', userADishes, accessToken);
+    const profileA = await analyzeDishes('user_a', userADishes);
     console.log('用户 A 口味画像:', JSON.stringify(profileA, null, 2));
   } catch (error) {
     console.error('分析失败:', error);
@@ -46,9 +46,9 @@ async function exampleGroupMatching() {
   try {
     // 并行分析三个用户
     const [profileA, profileB, profileC] = await Promise.all([
-      analyzeDishes('user_a', userADishes, accessToken),
-      analyzeDishes('user_b', userBDishes, accessToken),
-      analyzeDishes('user_c', userCDishes, accessToken),
+      analyzeDishes('user_a', userADishes),
+      analyzeDishes('user_b', userBDishes),
+      analyzeDishes('user_c', userCDishes),
     ]);
 
     console.log('\n========== 用户 A 画像 ==========');
@@ -116,7 +116,7 @@ function mockAnalyzeDishes(userId: string, rawDishes: string[]): UserTasteProfil
     preferred_ingredients: ['鸡肉', '猪肉', '豆腐', '蔬菜'],
     cooking_methods: ['爆炒', '红烧', '清蒸'],
     price_level: 2,
-    normalized_dishes
+    normalized_dishes: normalizedDishes
   };
 }
 
