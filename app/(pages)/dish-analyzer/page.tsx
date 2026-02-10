@@ -4,6 +4,7 @@ import React, { useState } from 'react';
 import { UserTasteProfile, TasteProfile, CuisinePreference } from '@/lib/ai-dish-analyzer';
 import { useAuth } from '@/components/auth/auth-provider';
 import { LoginButton } from '@/components/auth/login-button';
+import { AvatarChat } from '@/components/avatar/avatar-chat';
 
 // 用户输入数据
 interface UserInput {
@@ -295,6 +296,7 @@ const UserCard = ({
 // 群体匹配结果组件
 const GroupResult = ({ users }: { users: UserInput[] }) => {
   const analyzedUsers = users.filter(u => u.profile);
+  const [showAvatarChat, setShowAvatarChat] = useState(false);
   
   if (analyzedUsers.length < 2) {
     return (
@@ -309,6 +311,13 @@ const GroupResult = ({ users }: { users: UserInput[] }) => {
   }
   
   const merged = mergeProfiles(analyzedUsers.map(u => u.profile!));
+  
+  // 准备 AI 分身对话的参与者数据
+  const participants = analyzedUsers.map(u => ({
+    userId: u.id,
+    userName: u.name,
+    tasteProfile: u.profile!,
+  }));
   
   return (
     <div className="bg-gradient-to-br from-orange-50 to-amber-50 rounded-xl p-6">
@@ -344,7 +353,7 @@ const GroupResult = ({ users }: { users: UserInput[] }) => {
         </div>
       </div>
       
-      <div className="bg-white rounded-lg p-4">
+      <div className="bg-white rounded-lg p-4 mb-4">
         <p className="text-sm font-medium text-gray-800 mb-2">💡 推荐策略</p>
         {merged!.commonCuisines.length > 0 ? (
           <>
@@ -366,6 +375,27 @@ const GroupResult = ({ users }: { users: UserInput[] }) => {
           </div>
         )}
       </div>
+      
+      {/* AI 分身对话按钮 */}
+      <button
+        onClick={() => setShowAvatarChat(true)}
+        className="w-full py-3 bg-gradient-to-r from-blue-500 to-purple-600 text-white rounded-xl font-medium shadow-md hover:shadow-lg transition-all flex items-center justify-center gap-2"
+      >
+        <span>🤖</span>
+        <span>让 AI 分身讨论吃什么</span>
+      </button>
+      
+      {/* AI 分身对话弹窗 */}
+      {showAvatarChat && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+          <div className="w-full max-w-2xl">
+            <AvatarChat 
+              participants={participants}
+              onClose={() => setShowAvatarChat(false)}
+            />
+          </div>
+        </div>
+      )}
     </div>
   );
 };
