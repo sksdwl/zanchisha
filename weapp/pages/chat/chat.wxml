@@ -1,0 +1,105 @@
+<view class="container">
+  <!-- 聊天头部 -->
+  <view class="chat-header">
+    <view class="room-title">{{roomName}}</view>
+    <view class="participant-count">{{participants.length}} 个 AI 分身讨论中</view>
+  </view>
+
+  <!-- 消息列表 -->
+  <scroll-view 
+    class="message-list" 
+    scroll-y="{{true}}" 
+    scroll-into-view="{{scrollToId}}"
+    enhanced="{{true}}"
+    show-scrollbar="{{false}}"
+  >
+    <view class="system-msg">
+      <text class="system-text">🤖 AI 分身已就位，开始讨论吃什么</text>
+    </view>
+    
+    <block wx:for="{{messages}}" wx:key="id">
+      <view 
+        id="msg-{{item.id}}"
+        class="message {{item.isSelf ? 'message-self' : 'message-other'}}"
+        style="animation-delay: {{index * 0.1}}s"
+      >
+        <view class="avatar-wrapper">
+          <view class="avatar" style="background: {{item.color}}">
+            {{item.userName[0]}}
+          </view>
+          <text class="avatar-name">{{item.avatarName}}</text>
+        </view>
+        
+        <view class="message-content">
+          <view class="message-bubble">
+            <text class="message-text">{{item.content}}</text>
+          </view>
+          <view class="message-tag" style="background: {{item.tagColor}}">
+            {{item.typeText}}
+          </view>
+        </view>
+      </view>
+    </block>
+    
+    <!-- 正在输入 -->
+    <view wx:if="{{typing}}" class="typing">
+      <view class="typing-dot"></view>
+      <view class="typing-dot"></view>
+      <view class="typing-dot"></view>
+    </view>
+    
+    <view id="bottom"></view>
+  </scroll-view>
+
+  <!-- 推荐结果 -->
+  <view wx:if="{{showResult}}" class="result-card">
+    <view class="result-header">
+      <text class="result-icon">🎉</text>
+      <text class="result-title">AI 分身达成共识！</text>
+    </view>
+    
+    <view class="restaurant-info">
+      <view class="restaurant-header">
+        <view>
+          <text class="restaurant-name">{{restaurant.name}}</text>
+          <view class="restaurant-meta">
+            <text class="cuisine-tag">{{restaurant.cuisine}}</text>
+            <text class="rating">⭐ {{restaurant.rating}}</text>
+            <text class="cost">人均 ¥{{restaurant.cost}}</text>
+          </view>
+        </view>
+      </view>
+      
+      <view class="info-row">
+        <text class="info-icon">📍</text>
+        <text class="info-text">{{restaurant.address}}</text>
+      </view>
+      
+      <view class="info-row" wx:if="{{restaurant.tel}}">
+        <text class="info-icon">📞</text>
+        <text class="info-text">{{restaurant.tel}}</text>
+      </view>
+      
+      <view class="dishes-section">
+        <text class="dishes-title">🍽️ 推荐菜品</text>
+        <view class="dishes-list">
+          <text wx:for="{{restaurant.dishes}}" wx:key="index" class="dish-tag">
+            {{item}}
+          </text>
+        </view>
+      </view>
+      
+      <button class="nav-btn" bindtap="openMap">
+        <text>🗺️</text>
+        <text>高德地图导航</text>
+      </button>
+    </view>
+    
+    <view class="result-footer">
+      <text>🤖 由 AI 分身智能分析推荐</text>
+    </view>
+  </view>
+
+  <!-- 底部占位 -->
+  <view wx:if="{{!showResult}}" class="bottom-placeholder"></view>
+</view>

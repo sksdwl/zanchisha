@@ -1,0 +1,107 @@
+<view class="container">
+  <!-- 未输入邀请码状态 -->
+  <block wx:if="{{!verified}}">
+    <view class="invite-section">
+      <view class="invite-icon">🔐</view>
+      <view class="invite-title">输入邀请码</view>
+      <view class="invite-desc">请输入6位数字邀请码进入群聊房间</view>
+      
+      <!-- 邀请码输入框 -->
+      <view class="code-input-wrapper">
+        <input 
+          class="code-input" 
+          type="number" 
+          maxlength="6"
+          placeholder="请输入6位邀请码"
+          value="{{inputCode}}"
+          bindinput="onInput"
+          focus="{{true}}"
+        />
+      </view>
+      
+      <!-- 错误提示 -->
+      <view wx:if="{{errorMsg}}" class="error-msg">{{errorMsg}}</view>
+      
+      <!-- 确认按钮 -->
+      <button 
+        class="btn btn-primary {{inputCode.length !== 6 ? 'btn-disabled' : ''}}" 
+        bindtap="verifyCode"
+        disabled="{{inputCode.length !== 6 || loading}}"
+      >
+        {{loading ? '验证中...' : '进入房间'}}
+      </button>
+      
+      <!-- 测试邀请码 -->
+      <view class="test-section">
+        <text class="test-title">测试邀请码</text>
+        <view class="test-codes">
+          <text class="test-code" bindtap="useTestCode" data-code="123456">123456</text>
+          <text class="test-code" bindtap="useTestCode" data-code="888888">888888</text>
+          <text class="test-code" bindtap="useTestCode" data-code="666666">666666</text>
+        </view>
+      </view>
+    </view>
+  </block>
+  
+  <!-- 已验证状态 -->
+  <block wx:else>
+    <view class="room-header">
+      <view class="room-info">
+        <view class="room-name">{{roomInfo.roomName}}</view>
+        <view class="room-code">邀请码：{{roomInfo.code}}</view>
+      </view>
+      <view class="room-action" bindtap="resetCode">更换</view>
+    </view>
+    
+    <!-- 用户信息输入 -->
+    <view class="card profile-card">
+      <view class="profile-title">📝 完善你的口味信息</view>
+      <view class="profile-desc">让 AI 分身更好地代表你参与讨论</view>
+      
+      <view class="form-item">
+        <view class="form-label">你的昵称</view>
+        <input 
+          class="form-input" 
+          placeholder="请输入昵称"
+          value="{{userName}}"
+          bindinput="onNameInput"
+        />
+      </view>
+      
+      <view class="form-item">
+        <view class="form-label">喜欢的菜系</view>
+        <view class="cuisine-tags">
+          <view 
+            wx:for="{{cuisines}}" 
+            wx:key="index"
+            class="cuisine-tag {{item.selected ? 'selected' : ''}}"
+            bindtap="selectCuisine"
+            data-index="{{index}}"
+          >
+            {{item.name}}
+          </view>
+        </view>
+      </view>
+      
+      <view class="form-item">
+        <view class="form-label">口味偏好</view>
+        <view class="taste-slider">
+          <text class="slider-label">清淡</text>
+          <slider 
+            value="{{taste.spicy}}" 
+            min="0" 
+            max="100" 
+            show-value
+            bindchange="onSpicyChange"
+            activeColor="#ff6b35"
+          />
+          <text class="slider-label">重辣</text>
+        </view>
+      </view>
+      
+      <button class="btn btn-primary" bindtap="startChat">
+        🤖 开始 AI 分身讨论
+      </button>
+    </view>
+  </block>
+</view>

@@ -1,0 +1,164 @@
+/* 全局样式 */
+page {
+  --primary: #ff6b35;
+  --primary-light: #fff5f0;
+  --secondary: #667eea;
+  --success: #10b981;
+  --warning: #f59e0b;
+  --error: #ef4444;
+  --text: #1f2937;
+  --text-secondary: #6b7280;
+  --bg: #f5f5f5;
+  --white: #ffffff;
+  
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  background-color: var(--bg);
+  color: var(--text);
+}
+
+/* 通用容器 */
+.container {
+  padding: 30rpx;
+}
+
+/* 卡片样式 */
+.card {
+  background: var(--white);
+  border-radius: 24rpx;
+  padding: 30rpx;
+  margin-bottom: 20rpx;
+  box-shadow: 0 2rpx 12rpx rgba(0, 0, 0, 0.06);
+}
+
+/* 按钮样式 */
+.btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 28rpx 48rpx;
+  border-radius: 16rpx;
+  font-size: 32rpx;
+  font-weight: 500;
+  transition: all 0.3s;
+}
+
+.btn-primary {
+  background: linear-gradient(135deg, #ff6b35 0%, #f7931e 100%);
+  color: white;
+}
+
+.btn-primary:active {
+  opacity: 0.9;
+  transform: scale(0.98);
+}
+
+.btn-secondary {
+  background: var(--primary-light);
+  color: var(--primary);
+}
+
+/* 标题样式 */
+.title {
+  font-size: 48rpx;
+  font-weight: bold;
+  color: var(--text);
+  margin-bottom: 16rpx;
+}
+
+.subtitle {
+  font-size: 28rpx;
+  color: var(--text-secondary);
+  line-height: 1.5;
+}
+
+/* Flex 布局 */
+.flex {
+  display: flex;
+}
+
+.flex-col {
+  flex-direction: column;
+}
+
+.items-center {
+  align-items: center;
+}
+
+.justify-center {
+  justify-content: center;
+}
+
+.justify-between {
+  justify-content: space-between;
+}
+
+/* 间距 */
+.mt-2 { margin-top: 16rpx; }
+.mt-3 { margin-top: 24rpx; }
+.mt-4 { margin-top: 32rpx; }
+.mb-2 { margin-bottom: 16rpx; }
+.mb-3 { margin-bottom: 24rpx; }
+.mb-4 { margin-bottom: 32rpx; }
+
+/* 文本居中 */
+.text-center {
+  text-align: center;
+}
+
+/* 输入框样式 */
+.input {
+  width: 100%;
+  height: 96rpx;
+  padding: 0 24rpx;
+  border: 2rpx solid #e5e7eb;
+  border-radius: 16rpx;
+  font-size: 32rpx;
+  box-sizing: border-box;
+}
+
+.input:focus {
+  border-color: var(--primary);
+}
+
+/* 标签样式 */
+.tag {
+  display: inline-block;
+  padding: 8rpx 20rpx;
+  background: var(--primary-light);
+  color: var(--primary);
+  border-radius: 8rpx;
+  font-size: 24rpx;
+  margin-right: 12rpx;
+  margin-bottom: 12rpx;
+}
+
+/* 动画 */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(20rpx); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.3s ease-out;
+}
+
+/* 加载动画 */
+.loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 40rpx;
+}
+
+.loading-spinner {
+  width: 40rpx;
+  height: 40rpx;
+  border: 4rpx solid #f3f3f3;
+  border-top-color: var(--primary);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
