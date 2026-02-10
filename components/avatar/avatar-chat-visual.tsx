@@ -80,7 +80,7 @@ export function AvatarChatVisual({ participants, onClose, roomName = 'AI 讨论�
   // 获取当前正在输入的参与者
   const getCurrentTypingParticipant = () => {
     if (!currentTypingId || !session) return null;
-    return session.participants.find(p => p.userId === currentTypingId);
+    return session.participants.find(p => p.userId === currentTypingId) ?? null;
   };
 
   if (!session) {
