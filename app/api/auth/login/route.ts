@@ -5,11 +5,18 @@
 
 import { NextResponse } from 'next/server';
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
     // 从环境变量读取配置
     const clientId = process.env.SECONDME_CLIENT_ID;
-    const redirectUri = process.env.SECONDME_REDIRECT_URI || 'http://localhost:3000/api/auth/callback';
+    
+    // 动态确定回调地址
+    const host = request.headers.get('host');
+    const protocol = host?.includes('localhost') ? 'http' : 'https';
+    const defaultRedirectUri = `${protocol}://${host}/api/auth/callback`;
+    const redirectUri = process.env.SECONDME_REDIRECT_URI || defaultRedirectUri;
+    
+    console.log('[OAuth Login] Redirect URI:', redirectUri);
     
     if (!clientId) {
       return NextResponse.json(
@@ -45,6 +52,7 @@ export async function GET() {
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'lax',
       maxAge: 600, // 10 分钟
+      path: '/',
     });
     
     return response;

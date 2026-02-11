@@ -11,11 +11,16 @@ export const dynamic = 'force-dynamic';
 export async function GET(request: NextRequest) {
   try {
     // 检查环境变量
+    const host = request.headers.get('host');
+    const protocol = host?.includes('localhost') ? 'http' : 'https';
+    const dynamicRedirectUri = `${protocol}://${host}/api/auth/callback`;
+
     const envCheck = {
       hasClientId: !!process.env.SECONDME_CLIENT_ID,
       hasClientSecret: !!process.env.SECONDME_CLIENT_SECRET,
       hasRedirectUri: !!process.env.SECONDME_REDIRECT_URI,
       redirectUri: process.env.SECONDME_REDIRECT_URI,
+      dynamicRedirectUri,
       nodeEnv: process.env.NODE_ENV,
     };
 

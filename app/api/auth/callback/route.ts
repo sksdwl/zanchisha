@@ -59,7 +59,14 @@ export async function GET(request: NextRequest) {
     // 读取配置
     const clientId = process.env.SECONDME_CLIENT_ID;
     const clientSecret = process.env.SECONDME_CLIENT_SECRET;
-    const redirectUri = process.env.SECONDME_REDIRECT_URI || 'http://localhost:3000/api/auth/callback';
+    
+    // 动态确定回调地址 (必须与 login 时一致)
+    const host = request.headers.get('host');
+    const protocol = host?.includes('localhost') ? 'http' : 'https';
+    const defaultRedirectUri = `${protocol}://${host}/api/auth/callback`;
+    const redirectUri = process.env.SECONDME_REDIRECT_URI || defaultRedirectUri;
+    
+    console.log('[OAuth Callback] Using Redirect URI for token exchange:', redirectUri);
     
     if (!clientId || !clientSecret) {
       return NextResponse.redirect(
@@ -89,15 +96,18 @@ export async function GET(request: NextRequest) {
     console.log('[OAuth Callback] Response status:', tokenResponse.status);
 
     if (tokenResult.code !== 0 || !tokenResult.data?.accessToken) {
-      console.error('[OAuth Callback] Token 请求失败:', tokenResult);
-      console.error('[OAuth Callback] 请求参数:', {
-        grant_type: 'authorization_code',
-        client_id: clientId,
-        code: code,
-        redirect_uri: redirectUri,
+      console.error('[OAuth Callback] Token 请求失败:', {
+        status: tokenResponse.status,
+        result: tokenResult,
+        params: {
+          grant_type: 'authorization_code',
+          client_id: clientId,
+          redirect_uri: redirectUri,
+          code: code?.substring(0, 10) + '...',
+        }
       });
       return NextResponse.redirect(
-        new URL(`/?error=token_request_failed&message=${encodeURIComponent(tokenResult.message || '未知错误')}&code=${tokenResult.code}`, request.url)
+        new URL(`/?error=token_request_failed&message=${encodeURIComponent(tokenResult.message || 'Token 响应异常')}&code=${tokenResult.code}`, request.url)
       );
     }
     
@@ -115,6 +125,7 @@ export async function GET(request: NextRequest) {
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'lax',
       maxAge: tokenData.expiresIn || 7200, // 默认 2 小时
+      path: '/',
     });
     
     // 保存 refresh_token（如果有）
@@ -124,6 +135,7 @@ export async function GET(request: NextRequest) {
         secure: process.env.NODE_ENV === 'production',
         sameSite: 'lax',
         maxAge: 2592000, // 30 天
+        path: '/',
       });
     }
     
@@ -133,6 +145,7 @@ export async function GET(request: NextRequest) {
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'lax',
       maxAge: tokenData.expiresIn || 7200,
+      path: '/',
     });
 
     console.log('[OAuth Callback] ✅ 登录成功，已设置 cookies:', {

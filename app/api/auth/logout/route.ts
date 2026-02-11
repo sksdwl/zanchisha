@@ -21,8 +21,11 @@ export async function POST() {
 }
 
 // 也支持 GET 请求（方便测试）
-export async function GET() {
-  const response = NextResponse.redirect(new URL('/', process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'));
+export async function GET(request: Request) {
+  const host = request.headers.get('host');
+  const protocol = host?.includes('localhost') ? 'http' : 'https';
+  const baseUrl = `${protocol}://${host}`;
+  const response = NextResponse.redirect(new URL('/', baseUrl));
   
   // 清除所有认证相关的 cookie
   response.cookies.delete('access_token');
