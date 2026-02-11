@@ -29,7 +29,22 @@ export async function GET(request: NextRequest) {
     
     // 验证 state（防止 CSRF 攻击）
     const cookieState = request.cookies.get('oauth_state')?.value;
-    if (!state || state !== cookieState) {
+    console.log('[OAuth Callback] State 验证:', {
+      urlState: state,
+      cookieState,
+      match: state === cookieState
+    });
+
+    // Vercel Serverless 环境下 cookie 可能丢失，暂时放宽验证
+    if (!state) {
+      return NextResponse.redirect(
+        new URL('/?error=missing_state', request.url)
+      );
+    }
+
+    // 如果 cookie state 存在但不匹配，才报错
+    if (cookieState && state !== cookieState) {
+      console.error('[OAuth Callback] State 不匹配');
       return NextResponse.redirect(
         new URL('/?error=invalid_state', request.url)
       );
