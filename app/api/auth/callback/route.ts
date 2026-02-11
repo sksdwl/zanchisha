@@ -6,12 +6,18 @@
 import { NextRequest, NextResponse } from 'next/server';
 
 export async function GET(request: NextRequest) {
+  console.log('[OAuth Callback] ========== 回调开始 ==========');
+  console.log('[OAuth Callback] 完整 URL:', request.url);
+  console.log('[OAuth Callback] 请求头:', Object.fromEntries(request.headers.entries()));
+
   try {
     // 获取 URL 参数
     const searchParams = request.nextUrl.searchParams;
     const code = searchParams.get('code');
     const state = searchParams.get('state');
     const error = searchParams.get('error');
+
+    console.log('[OAuth Callback] URL 参数:', { code: code?.substring(0, 20), state, error });
     
     // 检查错误
     if (error) {
