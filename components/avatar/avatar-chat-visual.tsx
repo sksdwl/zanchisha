@@ -42,6 +42,7 @@ export function AvatarChatVisual({ participants, onClose, roomName = 'AI 讨论�
   const [currentTypingId, setCurrentTypingId] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const chatContainerRef = useRef<HTMLDivElement>(null);
+  const hasAutoStarted = useRef(false); // 防止重复自动启动
 
   // 保存讨论结果到 SecondMe
   const saveDiscussionToSecondMe = async (recommendation: RestaurantRecommendation) => {
@@ -274,6 +275,15 @@ export function AvatarChatVisual({ participants, onClose, roomName = 'AI 讨论�
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [visibleMessages]);
+
+  // 组件挂载时自动启动讨论（如果有 inviteCode）
+  useEffect(() => {
+    if (inviteCode && !session && !isLoading && !hasAutoStarted.current) {
+      console.log('[AvatarChat] 检测到 inviteCode，自动启动讨论');
+      hasAutoStarted.current = true;
+      startChat();
+    }
+  }, [inviteCode]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // 获取当前正在输入的参与者
   const getCurrentTypingParticipant = () => {
