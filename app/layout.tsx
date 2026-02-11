@@ -1,4 +1,5 @@
 import type { Metadata } from 'next'
+import { SpeedInsights } from '@vercel/speed-insights/next'
 import { AuthProvider } from '@/components/auth/auth-provider'
 import './globals.css'
 
@@ -18,6 +19,7 @@ export default function RootLayout({
         <AuthProvider>
           {children}
         </AuthProvider>
+        <SpeedInsights />
       </body>
     </html>
   )
