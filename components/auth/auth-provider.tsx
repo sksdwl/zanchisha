@@ -21,18 +21,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // 检查登录状态
   const checkSession = async () => {
     try {
+      console.log('[AuthProvider] 开始检查登录状态...');
       const response = await fetch('/api/auth/session');
       const result = await response.json();
-      
+
+      console.log('[AuthProvider] Session API 响应:', result);
+      console.log('[AuthProvider] isLoggedIn:', result.data?.isLoggedIn);
+
       if (result.code === 0 && result.data.isLoggedIn) {
+        console.log('[AuthProvider] ✅ 检测到已登录');
         setIsLoggedIn(true);
         setUser(result.data.user);
       } else {
+        console.log('[AuthProvider] ❌ 未登录');
         setIsLoggedIn(false);
         setUser(null);
       }
     } catch (error) {
-      console.error('检查登录状态失败:', error);
+      console.error('[AuthProvider] 检查登录状态失败:', error);
       setIsLoggedIn(false);
       setUser(null);
     } finally {
@@ -43,18 +49,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // 登录
   const login = async () => {
     try {
+      console.log('[AuthProvider] 开始登录流程...');
       setIsLoading(true);
       const response = await fetch('/api/auth/login');
       const result = await response.json();
-      
+
+      console.log('[AuthProvider] Login API 响应:', result);
+
       if (result.code === 0 && result.data.oauth_url) {
+        console.log('[AuthProvider] 跳转到 OAuth 授权页面:', result.data.oauth_url);
         // 跳转到 SecondMe 授权页面
         window.location.href = result.data.oauth_url;
       } else {
         throw new Error(result.message || '获取登录链接失败');
       }
     } catch (error) {
-      console.error('登录失败:', error);
+      console.error('[AuthProvider] 登录失败:', error);
       alert('登录失败，请重试');
       setIsLoading(false);
     }
