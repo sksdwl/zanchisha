@@ -80,6 +80,9 @@ export function GroupChatRoom() {
       clearInterval(interval);
     };
   }, [inviteCode, currentUser, step]);
+
+  // 加载 SecondMe 用户画像（仅在组件挂载时执行一次）
+  React.useEffect(() => {
     const loadSecondMeProfile = async () => {
       try {
         console.log('[SecondMe] 开始加载用户画像...');

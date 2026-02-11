@@ -5,6 +5,8 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 
+export const dynamic = 'force-dynamic';
+
 export async function GET(request: NextRequest) {
   console.log('[OAuth Callback] ========== 回调开始 ==========');
   console.log('[OAuth Callback] 完整 URL:', request.url);
