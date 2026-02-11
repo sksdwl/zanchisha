@@ -27,7 +27,8 @@ export async function GET() {
     oauthUrl.searchParams.append('redirect_uri', redirectUri);
     oauthUrl.searchParams.append('response_type', 'code');
     oauthUrl.searchParams.append('state', state);
-    oauthUrl.searchParams.append('scope', 'user.info chat');
+    // 请求所有需要的权限：用户信息、兴趣标签、软记忆、聊天、添加笔记
+    oauthUrl.searchParams.append('scope', 'user.info user.info.shades user.info.softmemory chat note.add');
     
     // 将 state 存入 cookie（用于后续验证）
     const response = NextResponse.json({

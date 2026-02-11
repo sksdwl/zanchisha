@@ -20,30 +20,215 @@ export function GroupChatRoom() {
   const [inviteCode, setInviteCode] = useState<InviteCode | null>(null);
   const [users, setUsers] = useState<RoomUser[]>([]);
   const [currentUser, setCurrentUser] = useState<RoomUser | null>(null);
+  const [isReady, setIsReady] = useState(false);
+  const [roomStatus, setRoomStatus] = useState<'waiting' | 'ready' | 'discussing'>('waiting');
+  const [isCreator, setIsCreator] = useState(false);
+  const [secondMeProfile, setSecondMeProfile] = useState<any>(null);
+  const [additionalInfo, setAdditionalInfo] = useState<string>('');
+
+  // 加载 SecondMe 用户信息和饮食偏好
+  React.useEffect(() => {
+    const loadSecondMeProfile = async () => {
+      try {
+        console.log('[SecondMe] 开始加载用户画像...');
+
+        const sessionResponse = await fetch('/api/auth/session');
+        const session = await sessionResponse.json();
+        console.log('[SecondMe] Session 响应:', session);
+
+        if (session.code === 0 && session.data.isLoggedIn) {
+          console.log('[SecondMe] 用户已登录，开始获取 shades 和 softmemory...');
+
+          const [shadesRes, memoryRes] = await Promise.all([
+            fetch('/api/secondme/user/shades'),
+            fetch('/api/secondme/user/softmemory'),
+          ]);
+
+          console.log('[SecondMe] Shades 响应状态:', shadesRes.status);
+          console.log('[SecondMe] Memory 响应状态:', memoryRes.status);
+
+          const shades = await shadesRes.json();
+          const memory = await memoryRes.json();
+
+          console.log('[SecondMe] Shades 数据:', shades);
+          console.log('[SecondMe] Memory 数据:', memory);
+
+          // 从软记忆中提取饮食偏好
+          const foodMemories = memory.code === 0
+            ? memory.data.list.filter((m: any) =>
+                m.content && (
+                  m.content.includes('喜欢') ||
+                  m.content.includes('菜') ||
+                  m.content.includes('口味') ||
+                  m.content.includes('餐厅')
+                )
+              )
+            : [];
+
+          setSecondMeProfile({
+            shades: shades.code === 0 ? shades.data.shades : [],
+            softMemory: memory.code === 0 ? memory.data.list : [],
+            foodMemories, // 饮食相关的记忆
+          });
+
+          console.log('[SecondMe] 加载用户画像成功:', {
+            shades: shades.code === 0 ? shades.data.shades.length : 0,
+            memories: memory.code === 0 ? memory.data.list.length : 0,
+            foodMemories: foodMemories.length,
+          });
+        } else {
+          console.log('[SecondMe] 用户未登录');
+        }
+      } catch (error) {
+        console.error('[SecondMe] 加载用户信息失败:', error);
+      }
+    };
+
+    loadSecondMeProfile();
+  }, []);
 
   // 邀请码验证成功
   const handleInviteSuccess = (code: InviteCode) => {
     setInviteCode(code);
     setStep('profile');
-    
+
+    // 生成稳定的用户ID（使用 localStorage 或固定值）
+    let userId = localStorage.getItem('temp_user_id');
+    if (!userId) {
+      userId = 'user_' + Date.now();
+      localStorage.setItem('temp_user_id', userId);
+    }
+
     // 添加当前用户到房间
     const newUser: RoomUser = {
-      id: 'user_' + Date.now(),
+      id: userId,
       name: '我',
       avatar: '👤',
       isReady: false,
     };
     setCurrentUser(newUser);
     setUsers([newUser]);
+
+    // 检查是否是创建者（第一个进入的人）
+    setIsCreator(true); // 简化处理，实际应该从后端获取
   };
 
-  // 用户完成口味画像
-  const handleProfileComplete = (tasteProfile: UserTasteProfile) => {
+  // 用户完成口味画像并标记准备
+  const handleProfileComplete = async (tasteProfile: UserTasteProfile) => {
     if (currentUser) {
-      const updatedUser = { ...currentUser, tasteProfile, isReady: true };
+      // 合并 SecondMe 信息和菜品分析
+      const enhancedProfile = {
+        ...tasteProfile,
+        secondMeShades: secondMeProfile?.shades || [],
+        secondMeSoftMemory: secondMeProfile?.softMemory || [],
+        additionalInfo: (tasteProfile as any).additionalInfo || '', // 用户补充的信息
+      };
+
+      const updatedUser = { ...currentUser, tasteProfile: enhancedProfile, isReady: true };
       setCurrentUser(updatedUser);
       setUsers(prev => prev.map(u => u.id === updatedUser.id ? updatedUser : u));
-      setStep('chat');
+      setIsReady(true);
+
+      // 保存口味画像到 SecondMe（如果已登录）
+      try {
+        const sessionResponse = await fetch('/api/auth/session');
+        const session = await sessionResponse.json();
+
+        if (session.code === 0 && session.data.isLoggedIn) {
+          // 构建饮食偏好笔记
+          const cuisines = tasteProfile.preferred_cuisines.map(c => c.name).join('、');
+          const ingredients = tasteProfile.preferred_ingredients.join('、');
+          const tasteDesc = [];
+          if (tasteProfile.taste_profile.spicy > 0.6) tasteDesc.push('喜欢辣');
+          if (tasteProfile.taste_profile.sweet > 0.6) tasteDesc.push('喜欢甜');
+          if (tasteProfile.taste_profile.numbing > 0.6) tasteDesc.push('喜欢麻');
+
+          let noteContent = `我的饮食偏好：
+- 偏爱菜系：${cuisines || '无特别偏好'}
+- 口味特点：${tasteDesc.join('、') || '口味适中'}
+- 喜欢的食材：${ingredients}
+- 价格偏好：${['经济实惠', '中等价位', '中高档', '高档'][tasteProfile.price_level - 1] || '中等价位'}`;
+
+          // 如果用户补充了信息，添加到笔记中
+          if ((tasteProfile as any).additionalInfo) {
+            noteContent += `\n\n补充说明：\n${(tasteProfile as any).additionalInfo}`;
+          }
+
+          await fetch('/api/secondme/note/add', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              content: noteContent,
+              tags: ['饮食偏好', '口味画像', '咱吃啥'],
+            }),
+          });
+
+          console.log('[SecondMe] 已保存口味画像到知识库');
+        }
+      } catch (error) {
+        console.warn('[SecondMe] 保存口味画像失败:', error);
+      }
+
+      // 调用后端 API 标记准备
+      try {
+        console.log('[前端] 调用 /api/room/ready，参数:', {
+          inviteCode: inviteCode?.code,
+          userId: currentUser.id,
+          userName: currentUser.name,
+        });
+
+        const response = await fetch('/api/room/ready', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            inviteCode: inviteCode?.code,
+            userId: currentUser.id,
+            userName: currentUser.name,
+            tasteProfile: enhancedProfile,
+          }),
+        });
+
+        const result = await response.json();
+        console.log('[前端] /api/room/ready 返回结果:', result);
+
+        if (result.code === 0) {
+          console.log('[前端] 设置房间状态为:', result.data.room.status);
+          console.log('[前端] isCreator:', result.data.room.isCreator);
+          setRoomStatus(result.data.room.status);
+
+          // 同时更新 isCreator 状态（从后端获取准确值）
+          setIsCreator(result.data.room.isCreator);
+        } else {
+          console.error('[前端] API 返回错误:', result.message);
+        }
+      } catch (error) {
+        console.error('标记准备失败:', error);
+      }
+    }
+  };
+
+  // 开始讨论（仅创建者）
+  const handleStart = async () => {
+    try {
+      const response = await fetch('/api/room/start', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          inviteCode: inviteCode?.code,
+          userId: currentUser?.id,
+        }),
+      });
+
+      const result = await response.json();
+      if (result.code === 0) {
+        setRoomStatus('discussing');
+        setStep('chat');
+      } else {
+        alert(result.message || '开始讨论失败');
+      }
+    } catch (error) {
+      console.error('开始讨论失败:', error);
+      alert('开始讨论失败');
     }
   };
 
@@ -94,24 +279,121 @@ export function GroupChatRoom() {
               <br />
               请先输入你喜欢的菜品
             </p>
-            <button
-              onClick={() => {
-                // 模拟完成口味画像
-                const mockProfile: UserTasteProfile = {
-                  user_id: currentUser?.id || 'user_1',
-                  preferred_cuisines: [{ name: '川菜', weight: 0.8 }, { name: '湘菜', weight: 0.6 }],
-                  taste_profile: { spicy: 0.7, sweet: 0.3, salty: 0.5, sour: 0.4, numbing: 0.6 },
-                  preferred_ingredients: ['牛肉', '辣椒', '豆腐'],
-                  cooking_methods: ['炒', '煮'],
-                  price_level: 2,
-                  normalized_dishes: [{ original: '宫保鸡丁', standard: '宫保鸡丁', cuisine: '川菜', aliases: [] }],
-                };
-                handleProfileComplete(mockProfile);
-              }}
-              className="px-6 py-3 bg-gradient-to-r from-orange-500 to-red-500 text-white rounded-xl font-medium shadow-lg hover:shadow-xl transition-all"
-            >
-              跳过，使用示例数据
-            </button>
+
+            {/* SecondMe 信息展示 - 调试版本 */}
+            {(() => {
+              console.log('[调试] secondMeProfile:', secondMeProfile);
+              console.log('[调试] shades数量:', secondMeProfile?.shades?.length || 0);
+              console.log('[调试] softMemory数量:', secondMeProfile?.softMemory?.length || 0);
+              console.log('[调试] foodMemories数量:', secondMeProfile?.foodMemories?.length || 0);
+              return null;
+            })()}
+
+            {secondMeProfile && (secondMeProfile.shades.length > 0 || secondMeProfile.softMemory.length > 0) ? (
+              <div className="bg-blue-100 p-4 rounded-lg mb-4 text-left">
+                <p className="text-sm text-blue-800 font-medium mb-2">
+                  ✅ 已加载你的 SecondMe 个人画像
+                </p>
+                {secondMeProfile.shades.length > 0 && (
+                  <div className="mt-2">
+                    <span className="text-xs text-blue-600">兴趣标签：</span>
+                    {secondMeProfile.shades.slice(0, 5).map((shade: any) => (
+                      <span key={shade.id} className="text-xs bg-blue-200 px-2 py-1 rounded ml-1">
+                        {shade.name}
+                      </span>
+                    ))}
+                  </div>
+                )}
+                {secondMeProfile.foodMemories && secondMeProfile.foodMemories.length > 0 && (
+                  <div className="mt-2">
+                    <span className="text-xs text-blue-600">饮食记忆：</span>
+                    <div className="mt-1 text-xs text-blue-700">
+                      {secondMeProfile.foodMemories.slice(0, 3).map((memory: any, idx: number) => (
+                        <div key={idx} className="mt-1">• {memory.content}</div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="bg-yellow-50 p-4 rounded-lg mb-4 text-left">
+                <p className="text-sm text-yellow-800">
+                  ℹ️ 未加载到 SecondMe 信息，请手动输入你的饮食偏好
+                </p>
+              </div>
+            )}
+
+            {/* 补充信息输入框 */}
+            {!isReady && (
+              <div className="mb-4">
+                <label className="block text-left text-sm font-medium text-gray-700 mb-2">
+                  补充你的饮食偏好（可选）
+                </label>
+                <textarea
+                  value={additionalInfo}
+                  onChange={(e) => setAdditionalInfo(e.target.value)}
+                  placeholder="例如：我喜欢吃川菜和湘菜，特别喜欢麻辣口味，不吃香菜..."
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent resize-none"
+                  rows={4}
+                />
+                <p className="text-xs text-gray-500 mt-1 text-left">
+                  💡 提示：输入你的口味偏好、喜欢的菜系、不吃的食材等，AI 会更好地理解你的需求
+                </p>
+              </div>
+            )}
+
+            {!isReady ? (
+              <button
+                onClick={() => {
+                  // 模拟完成口味画像
+                  const mockProfile: UserTasteProfile = {
+                    user_id: currentUser?.id || 'user_1',
+                    preferred_cuisines: [{ name: '川菜', weight: 0.8 }, { name: '湘菜', weight: 0.6 }],
+                    taste_profile: { spicy: 0.7, sweet: 0.3, salty: 0.5, sour: 0.4, numbing: 0.6 },
+                    preferred_ingredients: ['牛肉', '辣椒', '豆腐'],
+                    cooking_methods: ['炒', '煮'],
+                    price_level: 2,
+                    normalized_dishes: [{ original: '宫保鸡丁', standard: '宫保鸡丁', cuisine: '川菜', aliases: [] }],
+                    additionalInfo: additionalInfo, // 添加用户补充的信息
+                  };
+                  handleProfileComplete(mockProfile);
+                }}
+                className="px-6 py-3 bg-gradient-to-r from-orange-500 to-red-500 text-white rounded-xl font-medium shadow-lg hover:shadow-xl transition-all"
+              >
+                准备完成
+              </button>
+            ) : (
+              <div className="space-y-4">
+                <div className="flex items-center justify-center text-green-600 font-medium">
+                  ✅ 已准备
+                </div>
+
+                {/* 调试信息 */}
+                <div className="text-xs text-gray-500 text-center">
+                  调试: isCreator={isCreator.toString()}, roomStatus={roomStatus}
+                </div>
+
+                {/* 开始按钮（仅创建者可见） */}
+                {isCreator && roomStatus === 'ready' && (
+                  <button
+                    onClick={handleStart}
+                    className="px-6 py-3 bg-gradient-to-r from-green-500 to-emerald-500 text-white rounded-xl font-medium shadow-lg hover:shadow-xl transition-all"
+                  >
+                    🚀 开始讨论
+                  </button>
+                )}
+
+                {/* 等待提示 */}
+                {roomStatus === 'waiting' && (
+                  <p className="text-gray-600 text-sm">
+                    {users.length === 1
+                      ? '单人模式：点击上方"开始讨论"即可开始'
+                      : `等待其他成员准备... (${users.filter(u => u.isReady).length}/${users.length})`
+                    }
+                  </p>
+                )}
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -146,6 +428,7 @@ export function GroupChatRoom() {
               userName: u.name,
               tasteProfile: u.tasteProfile!,
             }))}
+            inviteCode={inviteCode?.code}
             onClose={handleBack}
           />
         )}

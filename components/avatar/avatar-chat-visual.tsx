@@ -1,11 +1,10 @@
 'use client';
 
 import React, { useState, useRef, useEffect } from 'react';
-import { 
-  AvatarChatSession, 
-  AvatarMessage, 
+import {
+  AvatarChatSession,
+  AvatarMessage,
   RestaurantRecommendation,
-  completeAvatarChat,
   AvatarParticipant
 } from '@/lib/ai-avatar-chat';
 import { UserTasteProfile } from '@/lib/ai-dish-analyzer';
@@ -18,6 +17,7 @@ interface AvatarChatVisualProps {
   }[];
   onClose: () => void;
   roomName?: string;
+  inviteCode?: string;
 }
 
 // AI 分身头像颜色配置
@@ -35,7 +35,7 @@ const getParticipantColor = (index: number) => {
   return AVATAR_COLORS[index % AVATAR_COLORS.length];
 };
 
-export function AvatarChatVisual({ participants, onClose, roomName = 'AI 讨论群' }: AvatarChatVisualProps) {
+export function AvatarChatVisual({ participants, onClose, roomName = 'AI 讨论群', inviteCode }: AvatarChatVisualProps) {
   const [session, setSession] = useState<AvatarChatSession | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [visibleMessages, setVisibleMessages] = useState<number>(0);
@@ -43,32 +43,148 @@ export function AvatarChatVisual({ participants, onClose, roomName = 'AI 讨论�
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const chatContainerRef = useRef<HTMLDivElement>(null);
 
-  // 开始 AI 分身对话
+  // 保存讨论结果到 SecondMe
+  const saveDiscussionToSecondMe = async (recommendation: RestaurantRecommendation) => {
+    try {
+      const sessionResponse = await fetch('/api/auth/session');
+      const session = await sessionResponse.json();
+
+      if (session.code === 0 && session.data.isLoggedIn) {
+        const noteContent = `今天吃什么讨论结果：
+推荐餐厅：${recommendation.restaurantName}
+菜系：${recommendation.cuisine}
+推荐理由：${recommendation.reason}
+推荐菜品：${recommendation.dishes.join('、')}
+价格档次：${['经济实惠', '中等价位', '中高档', '高档'][recommendation.priceLevel - 1]}
+评分：${recommendation.rating}分
+
+参与讨论：${recommendation.suitableFor.join('、')}`;
+
+        await fetch('/api/secondme/note/add', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            content: noteContent,
+            tags: ['餐厅推荐', '讨论结果', '咱吃啥', recommendation.cuisine],
+          }),
+        });
+
+        console.log('[SecondMe] 已保存讨论结果到知识库');
+      }
+    } catch (error) {
+      console.warn('[SecondMe] 保存讨论结果失败:', error);
+    }
+  };
+
+  // 开始 AI 分身对话（使用 SSE 流式传输）
   const startChat = async () => {
     setIsLoading(true);
+
+    // 初始化 session
+    const initialSession: AvatarChatSession = {
+      id: `chat_${Date.now()}`,
+      participants: participants.map(p => ({
+        userId: p.userId,
+        userName: p.userName,
+        avatarName: `${p.userName}的美食向导`,
+        avatarPersonality: '',
+        tasteProfile: p.tasteProfile,
+        isOnline: true,
+      })),
+      messages: [],
+      status: 'ongoing',
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+    };
+    setSession(initialSession);
+
     try {
-      const result = await completeAvatarChat(participants);
-      setSession(result);
-      setVisibleMessages(0);
+      // 使用 SSE 流式接收消息
+      const response = await fetch('/api/avatar-chat/stream', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ inviteCode }),
+      });
+
+      if (!response.ok) {
+        throw new Error('启动讨论失败');
+      }
+
+      const reader = response.body?.getReader();
+      const decoder = new TextDecoder();
+
+      if (!reader) {
+        throw new Error('无法读取响应流');
+      }
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        const chunk = decoder.decode(value);
+        const lines = chunk.split('\n');
+
+        for (const line of lines) {
+          if (line.startsWith('data: ')) {
+            try {
+              const data = JSON.parse(line.slice(6));
+
+              if (data.type === 'message') {
+                // 添加新消息
+                setSession(prev => {
+                  if (!prev) return prev;
+                  return {
+                    ...prev,
+                    messages: [...prev.messages, data.data],
+                  };
+                });
+                // 自动增加可见消息数
+                setVisibleMessages(prev => prev + 1);
+              } else if (data.type === 'recommendation') {
+                // 设置推荐结果
+                setSession(prev => {
+                  if (!prev) return prev;
+                  return {
+                    ...prev,
+                    recommendation: data.data,
+                    status: 'reached_consensus',
+                  };
+                });
+
+                // 保存讨论结果到 SecondMe
+                saveDiscussionToSecondMe(data.data);
+              } else if (data.type === 'done') {
+                setIsLoading(false);
+              } else if (data.type === 'error') {
+                console.warn('SSE 错误:', data.message);
+              }
+            } catch (e) {
+              console.error('解析 SSE 数据失败:', e);
+            }
+          }
+        }
+      }
     } catch (error: any) {
+      console.error('AI 分身对话失败:', error);
       alert('AI 分身对话失败：' + error.message);
-    } finally {
       setIsLoading(false);
     }
   };
 
-  // 打字机效果：逐条显示消息
+  // 打字机效果：显示正在输入的提示
   useEffect(() => {
     if (session && visibleMessages < session.messages.length) {
       const currentMsg = session.messages[visibleMessages];
       setCurrentTypingId(currentMsg.userId);
-      
+
+      // 短暂显示"正在输入"后立即显示消息
       const timer = setTimeout(() => {
-        setVisibleMessages(prev => prev + 1);
         setCurrentTypingId(null);
-      }, 1500); // 每条消息间隔 1.5 秒，给用户阅读时间
-      
+      }, 800);
+
       return () => clearTimeout(timer);
+    } else {
+      setCurrentTypingId(null);
     }
   }, [session, visibleMessages]);
 
