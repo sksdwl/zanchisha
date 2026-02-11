@@ -126,7 +126,13 @@ export async function GET(request: NextRequest) {
       httpOnly: false, // 前端可以读取
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'lax',
-      maxAge: tokenData.expires_in || 7200,
+      maxAge: tokenData.expiresIn || 7200,
+    });
+
+    console.log('[OAuth Callback] ✅ 登录成功，已设置 cookies:', {
+      accessToken: tokenData.accessToken.substring(0, 20) + '...',
+      expiresIn: tokenData.expiresIn,
+      hasRefreshToken: !!tokenData.refreshToken,
     });
     
     return response;
