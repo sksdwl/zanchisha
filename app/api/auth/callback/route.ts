@@ -62,11 +62,21 @@ export async function GET(request: NextRequest) {
     });
     
     const tokenResult = await tokenResponse.json();
-    
+
+    // 详细日志
+    console.log('[OAuth Callback] Token 响应:', JSON.stringify(tokenResult));
+    console.log('[OAuth Callback] Response status:', tokenResponse.status);
+
     if (tokenResult.code !== 0 || !tokenResult.data?.accessToken) {
-      console.error('Token 请求失败:', tokenResult);
+      console.error('[OAuth Callback] Token 请求失败:', tokenResult);
+      console.error('[OAuth Callback] 请求参数:', {
+        grant_type: 'authorization_code',
+        client_id: clientId,
+        code: code,
+        redirect_uri: redirectUri,
+      });
       return NextResponse.redirect(
-        new URL(`/?error=token_request_failed&message=${encodeURIComponent(tokenResult.message || '未知错误')}`, request.url)
+        new URL(`/?error=token_request_failed&message=${encodeURIComponent(tokenResult.message || '未知错误')}&code=${tokenResult.code}`, request.url)
       );
     }
     
