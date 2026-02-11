@@ -96,9 +96,9 @@ export async function GET(request: NextRequest) {
     }
     
     const tokenData = tokenResult.data;
-    
+
     // 创建响应，重定向到首页
-    const response = NextResponse.redirect(new URL('/dish-analyzer', request.url));
+    const response = NextResponse.redirect(new URL('/', request.url));
     
     // 清除 oauth_state cookie
     response.cookies.delete('oauth_state');
