@@ -106,8 +106,18 @@ export async function POST(request: NextRequest) {
         const doneData = `data: ${JSON.stringify({ type: 'done' })}\n\n`;
         controller.enqueue(encoder.encode(doneData));
 
-        // 10. 更新房间状态
+        // 10. 更新房间状态并清理
         await unifiedRoomManager.completeDiscussion(inviteCode);
+
+        // 延迟删除房间（给前端时间展示结果）
+        setTimeout(async () => {
+          try {
+            await unifiedRoomManager.deleteRoom(inviteCode);
+            console.log(`[SSE] 已清理房间缓存: ${inviteCode}`);
+          } catch (error) {
+            console.error(`[SSE] 清理房间缓存失败:`, error);
+          }
+        }, 60000); // 60秒后删除
 
         console.log(`[SSE] Agent 讨论完成，房间: ${inviteCode}`);
 

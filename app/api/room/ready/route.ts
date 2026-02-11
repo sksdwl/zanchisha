@@ -21,7 +21,7 @@ export async function POST(request: NextRequest) {
 
     // 如果房间不存在或已完成，创建新房间
     let room = await unifiedRoomManager.getRoom(inviteCode);
-    if (!room || room.status === 'completed' || room.status === 'discussing') {
+    if (!room || room.status === 'completed') {
       if (room) {
         console.log(`[API] 房间状态为 ${room.status}，重新创建房间`);
         // 删除旧房间
@@ -36,9 +36,16 @@ export async function POST(request: NextRequest) {
         isReady: false,
         joinedAt: Date.now(),
       });
+    } else if (room.status === 'discussing') {
+      // 如果房间正在讨论中，不允许新用户加入
+      console.log('[API] 房间正在讨论中，不允许加入');
+      return NextResponse.json(
+        { code: 400, message: '房间正在讨论中，请稍后再试' },
+        { status: 400 }
+      );
     } else {
       console.log('[API] 房间已存在，检查用户是否在房间中');
-      // 房间存在且状态正常，检查用户是否已在房间中
+      // 房间存在且状态正常（waiting/ready），检查用户是否已在房间中
       const participant = room.participants.find(p => p.userId === userId);
       if (!participant) {
         console.log('[API] 用户不在房间中，加入房间');
