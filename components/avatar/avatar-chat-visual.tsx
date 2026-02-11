@@ -173,6 +173,23 @@ export function AvatarChatVisual({ participants, onClose, roomName = 'AI 讨论�
                 } else if (data.type === 'done') {
                   setIsLoading(false);
                   console.log('[SSE] 讨论完成');
+
+                  // 保存完整的讨论结果到 localStorage
+                  setSession(prev => {
+                    if (prev) {
+                      try {
+                        const sessionData = {
+                          ...prev,
+                          savedAt: Date.now(),
+                        };
+                        localStorage.setItem(`chat_session_${inviteCode}`, JSON.stringify(sessionData));
+                        console.log('[前端] 已保存讨论结果到本地存储');
+                      } catch (error) {
+                        console.warn('[前端] 保存讨论结果失败:', error);
+                      }
+                    }
+                    return prev;
+                  });
                 } else if (data.type === 'error') {
                   console.warn('[SSE] 服务器错误:', data.message);
                 }

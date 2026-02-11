@@ -106,10 +106,10 @@ export async function POST(request: NextRequest) {
         const doneData = `data: ${JSON.stringify({ type: 'done' })}\n\n`;
         controller.enqueue(encoder.encode(doneData));
 
-        // 10. 更新房间状态并立即清理
+        // 10. 更新房间状态并立即删除
         await unifiedRoomManager.completeDiscussion(inviteCode);
 
-        // 立即删除房间缓存
+        // 立即删除房间缓存（前端会保存完整结果到 localStorage）
         try {
           await unifiedRoomManager.deleteRoom(inviteCode);
           console.log(`[SSE] 已清理房间缓存: ${inviteCode}`);
