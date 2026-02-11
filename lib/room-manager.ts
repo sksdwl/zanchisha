@@ -203,7 +203,7 @@ export class RoomManager {
     const now = Date.now();
     let cleaned = 0;
 
-    for (const [code, room] of this.rooms.entries()) {
+    for (const [code, room] of Array.from(this.rooms.entries())) {
       const age = now - (room.completedAt || room.startedAt || 0);
       if (age > maxAgeMs) {
         this.rooms.delete(code);

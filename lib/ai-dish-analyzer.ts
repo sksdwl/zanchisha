@@ -32,6 +32,9 @@ export interface UserTasteProfile {
   cooking_methods: string[];
   price_level: 1 | 2 | 3 | 4;  // 1=便宜, 4=贵
   normalized_dishes: NormalizedDish[];
+  additionalInfo?: string;
+  secondMeShades?: any[];
+  secondMeSoftMemory?: any[];
 }
 
 /**

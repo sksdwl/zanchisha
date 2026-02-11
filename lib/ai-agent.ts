@@ -45,14 +45,14 @@ export class FoodDiscussionAgent {
     const parts: string[] = [];
 
     // 如果有 SecondMe 兴趣标签
-    if ((tasteProfile as any).secondMeShades && (tasteProfile as any).secondMeShades.length > 0) {
-      const shades = (tasteProfile as any).secondMeShades.map((s: any) => s.name).join('、');
+    if (tasteProfile.secondMeShades && tasteProfile.secondMeShades.length > 0) {
+      const shades = tasteProfile.secondMeShades.map((s: any) => s.name).join('、');
       parts.push(`我的兴趣爱好：${shades}`);
     }
 
     // 如果有 SecondMe 软记忆
-    if ((tasteProfile as any).secondMeSoftMemory && (tasteProfile as any).secondMeSoftMemory.length > 0) {
-      const memories = (tasteProfile as any).secondMeSoftMemory
+    if (tasteProfile.secondMeSoftMemory && tasteProfile.secondMeSoftMemory.length > 0) {
+      const memories = tasteProfile.secondMeSoftMemory
         .slice(0, 3)
         .map((m: any) => m.content)
         .join('；');
@@ -67,7 +67,7 @@ export class FoodDiscussionAgent {
 
     // 优先使用 SecondMe 信息或用户补充的信息
     const hasSecondMeInfo = this.secondMeContext && this.secondMeContext.length > 0;
-    const hasAdditionalInfo = (this.tasteProfile as any).additionalInfo && (this.tasteProfile as any).additionalInfo.length > 0;
+    const hasAdditionalInfo = this.tasteProfile.additionalInfo && this.tasteProfile.additionalInfo.length > 0;
 
     if (hasSecondMeInfo || hasAdditionalInfo) {
       // 使用 SecondMe 信息或用户补充的信息
@@ -78,7 +78,7 @@ export class FoodDiscussionAgent {
       }
 
       if (hasAdditionalInfo) {
-        prompt += `\n用户补充说明：\n${(this.tasteProfile as any).additionalInfo}\n`;
+        prompt += `\n用户补充说明：\n${this.tasteProfile.additionalInfo}\n`;
       }
     } else {
       // 降级：使用菜品分析的信息

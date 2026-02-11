@@ -116,13 +116,20 @@ export class AgentOrchestrator {
     // 优先使用高德地图 API 获取真实餐厅
     try {
       console.log('[Orchestrator] 调用高德地图 API 获取真实餐厅...');
-      const realRecommendation = await getRealRestaurantRecommendation(merged);
+      const cuisine = merged.common_cuisines[0] || '美食';
+      const result = await getRealRestaurantRecommendation(cuisine);
 
-      if (realRecommendation) {
-        console.log('[Orchestrator] 高德地图 API 返回餐厅:', realRecommendation.restaurantName);
+      if (result && result.restaurant) {
+        console.log('[Orchestrator] 高德地图 API 返回餐厅:', result.restaurant.name);
         return {
-          ...realRecommendation,
+          restaurantName: result.restaurant.name,
+          cuisine: result.restaurant.type?.split(';')[1] || cuisine,
+          reason: `大家共同喜欢${cuisine}，高德地图为您推荐评分较高的：${result.restaurant.name}。${result.restaurant.address ? `地址在${result.restaurant.address}。` : ''}`,
           suitableFor: this.agents.map(a => a.getParticipant().userName),
+          priceLevel: (parseInt(result.restaurant.biz_ext?.cost || '60') > 100 ? 3 : 2) as 1 | 2 | 3 | 4,
+          dishes: ['招牌菜', '特色推荐'],
+          location: result.restaurant.address,
+          rating: parseFloat(result.restaurant.biz_ext?.rating || '4.5'),
         };
       }
     } catch (error) {

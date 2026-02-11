@@ -79,7 +79,7 @@ export async function POST(request: NextRequest) {
 }
 
 // 生成完整对话内容
-function generateFullConversation(
+export function generateFullConversation(
   participants: AvatarParticipant[],
   merged: ReturnType<typeof mergeProfiles>
 ): AvatarMessage[] {
