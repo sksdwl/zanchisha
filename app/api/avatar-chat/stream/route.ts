@@ -106,16 +106,19 @@ export async function POST(request: NextRequest) {
         const doneData = `data: ${JSON.stringify({ type: 'done' })}\n\n`;
         controller.enqueue(encoder.encode(doneData));
 
-        // 10. 更新房间状态并立即删除
+        // 10. 更新房间状态为已完成
         await unifiedRoomManager.completeDiscussion(inviteCode);
 
-        // 立即删除房间缓存（前端会保存完整结果到 localStorage）
-        try {
-          await unifiedRoomManager.deleteRoom(inviteCode);
-          console.log(`[SSE] 已清理房间缓存: ${inviteCode}`);
-        } catch (error) {
-          console.error(`[SSE] 清理房间缓存失败:`, error);
-        }
+        // 延迟删除房间（给所有参与者时间看到结果）
+        // 注意：前端会保存完整结果到 localStorage，所以删除后不影响查看
+        setTimeout(async () => {
+          try {
+            await unifiedRoomManager.deleteRoom(inviteCode);
+            console.log(`[SSE] 已清理房间缓存: ${inviteCode}`);
+          } catch (error) {
+            console.error(`[SSE] 清理房间缓存失败:`, error);
+          }
+        }, 30000); // 30秒后删除
 
         console.log(`[SSE] Agent 讨论完成，房间: ${inviteCode}`);
 
