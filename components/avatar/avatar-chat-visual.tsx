@@ -326,16 +326,18 @@ export function AvatarChatVisual({ participants, onClose, roomName = 'AI 讨论�
         {/* 消息列表 */}
         {session.messages.slice(0, visibleMessages).map((msg, index) => {
           const participantIndex = session.participants.findIndex(p => p.userId === msg.userId);
-          const color = getParticipantColor(participantIndex);
+          // 如果找不到参与者，使用默认索引 0
+          const safeIndex = participantIndex >= 0 ? participantIndex : 0;
+          const color = getParticipantColor(safeIndex);
           const isMe = participantIndex === 0; // 第一个参与者显示在右边
-          
+
           return (
             <MessageBubble
               key={msg.id}
               message={msg}
               color={color}
               isRight={!isMe} // 交替显示左右
-              index={participantIndex}
+              index={safeIndex}
             />
           );
         })}

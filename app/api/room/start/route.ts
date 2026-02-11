@@ -4,7 +4,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { roomManager } from '@/lib/room-manager';
+import { unifiedRoomManager } from '@/lib/room-manager-unified';
 
 export async function POST(request: NextRequest) {
   try {
@@ -18,7 +18,7 @@ export async function POST(request: NextRequest) {
     }
 
     // 检查是否可以开始
-    if (!roomManager.canStart(inviteCode, userId)) {
+    if (!(await unifiedRoomManager.canStart(inviteCode, userId))) {
       return NextResponse.json(
         { code: 403, message: '无权开始讨论或房间未准备好' },
         { status: 403 }
@@ -26,7 +26,7 @@ export async function POST(request: NextRequest) {
     }
 
     // 开始讨论
-    const room = roomManager.startDiscussion(inviteCode, userId);
+    const room = await unifiedRoomManager.startDiscussion(inviteCode, userId);
 
     return NextResponse.json({
       code: 0,

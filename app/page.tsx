@@ -3,9 +3,13 @@
 import { useAuth } from '@/components/auth/auth-provider';
 import { LoginButton } from '@/components/auth/login-button';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import { useState } from 'react';
 
 export default function HomePage() {
   const { isLoggedIn, isLoading } = useAuth();
+  const router = useRouter();
+  const [showLoginTip, setShowLoginTip] = useState(false);
 
   if (isLoading) {
     return (
@@ -17,6 +21,18 @@ export default function HomePage() {
       </div>
     );
   }
+
+  // 处理进入房间的点击
+  const handleEnterRoom = (e: React.MouseEvent) => {
+    if (!isLoggedIn) {
+      e.preventDefault();
+      setShowLoginTip(true);
+      // 3秒后自动隐藏提示
+      setTimeout(() => setShowLoginTip(false), 3000);
+    } else {
+      router.push('/room');
+    }
+  };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-orange-50 to-amber-50">
@@ -48,8 +64,8 @@ export default function HomePage() {
 
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
             {/* 群聊房间入口 */}
-            <Link
-              href="/room"
+            <button
+              onClick={handleEnterRoom}
               className="inline-flex items-center gap-2 px-8 py-4 bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white text-lg font-medium rounded-xl transition-all shadow-lg hover:shadow-xl"
             >
               <span>🤖</span>
@@ -57,8 +73,8 @@ export default function HomePage() {
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
               </svg>
-            </Link>
-            
+            </button>
+
             {/* 原来的功能入口 */}
             <Link
               href="/dish-analyzer"
@@ -68,7 +84,19 @@ export default function HomePage() {
               <span>单人分析</span>
             </Link>
           </div>
-          
+
+          {/* 登录提示 */}
+          {showLoginTip && (
+            <div className="mt-4 bg-yellow-50 border border-yellow-200 rounded-lg p-4 animate-bounce">
+              <p className="text-yellow-800 font-medium">
+                ⚠️ 请先登录 SecondMe 账号才能进入群聊房间
+              </p>
+              <p className="text-yellow-600 text-sm mt-1">
+                点击右上角的"登录"按钮进行登录
+              </p>
+            </div>
+          )}
+
           <p className="text-sm text-gray-500 mt-4">
             🤖 AI群聊：输入邀请码，和好友的AI分身一起讨论吃什么
           </p>

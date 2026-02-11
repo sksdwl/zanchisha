@@ -8,7 +8,7 @@ import { NextRequest } from 'next/server';
 import { DeepSeekClient } from '@/lib/deepseek-client';
 import { FoodDiscussionAgent } from '@/lib/ai-agent';
 import { AgentOrchestrator } from '@/lib/agent-orchestrator';
-import { roomManager } from '@/lib/room-manager';
+import { unifiedRoomManager } from '@/lib/room-manager-unified';
 import { generateAvatarPersonality } from '@/lib/ai-avatar-chat';
 
 export async function POST(request: NextRequest) {
@@ -17,7 +17,7 @@ export async function POST(request: NextRequest) {
   console.log(`[SSE] 收到流式请求，房间: ${inviteCode}`);
 
   // 1. 验证房间状态
-  const room = roomManager.getRoom(inviteCode);
+  const room = await unifiedRoomManager.getRoom(inviteCode);
 
   if (!room) {
     console.error(`[SSE] 房间不存在: ${inviteCode}`);

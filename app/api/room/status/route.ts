@@ -4,7 +4,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { roomManager } from '@/lib/room-manager';
+import { unifiedRoomManager } from '@/lib/room-manager-unified';
 
 export const dynamic = 'force-dynamic';
 
@@ -21,7 +21,7 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const room = roomManager.getRoom(inviteCode);
+    const room = await unifiedRoomManager.getRoom(inviteCode);
 
     if (!room) {
       return NextResponse.json({

@@ -4,7 +4,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { roomManager } from '@/lib/room-manager';
+import { unifiedRoomManager } from '@/lib/room-manager-unified';
 
 export async function POST(request: NextRequest) {
   try {
@@ -20,17 +20,17 @@ export async function POST(request: NextRequest) {
     }
 
     // 如果房间不存在或已完成，创建新房间
-    let room = roomManager.getRoom(inviteCode);
+    let room = await unifiedRoomManager.getRoom(inviteCode);
     if (!room || room.status === 'completed' || room.status === 'discussing') {
       if (room) {
         console.log(`[API] 房间状态为 ${room.status}，重新创建房间`);
         // 删除旧房间
-        roomManager.deleteRoom(inviteCode);
+        await unifiedRoomManager.deleteRoom(inviteCode);
       } else {
         console.log('[API] 房间不存在，创建新房间');
       }
 
-      room = roomManager.createRoom(inviteCode, {
+      room = await unifiedRoomManager.createRoom(inviteCode, {
         userId,
         userName: userName || '用户',
         isReady: false,
@@ -42,7 +42,7 @@ export async function POST(request: NextRequest) {
       const participant = room.participants.find(p => p.userId === userId);
       if (!participant) {
         console.log('[API] 用户不在房间中，加入房间');
-        room = roomManager.joinRoom(inviteCode, {
+        room = await unifiedRoomManager.joinRoom(inviteCode, {
           userId,
           userName: userName || '用户',
           isReady: false,
@@ -55,7 +55,7 @@ export async function POST(request: NextRequest) {
 
     // 标记用户已准备
     console.log('[API] 标记用户已准备');
-    room = roomManager.markReady(inviteCode, userId, tasteProfile);
+    room = await unifiedRoomManager.markReady(inviteCode, userId, tasteProfile);
 
     console.log('[API] 返回房间状态:', {
       status: room.status,
