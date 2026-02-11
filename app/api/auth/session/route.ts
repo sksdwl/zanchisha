@@ -9,12 +9,14 @@ export async function GET(request: NextRequest) {
   try {
     // 从 cookie 获取 access_token
     const accessToken = request.cookies.get('access_token')?.value;
+    const allCookies = request.cookies.getAll();
 
-    console.log('[Session Check] 检查登录状态:', {
-      hasAccessToken: !!accessToken,
-      tokenPreview: accessToken?.substring(0, 20) + '...',
-      allCookies: request.cookies.getAll().map(c => c.name),
-    });
+    console.log('[Session Check] ========== Session 检查开始 ==========');
+    console.log('[Session Check] 请求 URL:', request.url);
+    console.log('[Session Check] 请求头 Cookie:', request.headers.get('cookie'));
+    console.log('[Session Check] 所有 Cookies:', allCookies.map(c => ({ name: c.name, hasValue: !!c.value })));
+    console.log('[Session Check] access_token 存在:', !!accessToken);
+    console.log('[Session Check] access_token 预览:', accessToken?.substring(0, 20) + '...');
 
     // 如果没有 token，返回未登录状态
     if (!accessToken) {
