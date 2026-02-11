@@ -13,6 +13,7 @@ interface RoomUser {
   avatar: string;
   tasteProfile?: UserTasteProfile;
   isReady: boolean;
+  isCreator?: boolean; // 是否为群主
 }
 
 export function GroupChatRoom() {
@@ -55,6 +56,7 @@ export function GroupChatRoom() {
             name: p.userName,
             avatar: '👤',
             isReady: p.isReady,
+            isCreator: p.isCreator, // 添加群主标记
           }));
           setUsers(updatedUsers);
 
@@ -279,11 +281,18 @@ export function GroupChatRoom() {
         setRoomStatus('discussing');
         setStep('chat');
       } else {
-        alert(result.message || '开始讨论失败');
+        // 显示详细的错误信息，包括未准备的成员
+        const notReadyUsers = users.filter(u => !u.isReady);
+        if (notReadyUsers.length > 0) {
+          const notReadyNames = notReadyUsers.map(u => u.name).join('、');
+          alert(`无法开始讨论\n\n以下成员还未准备：\n${notReadyNames}\n\n请等待所有成员准备后再开始。`);
+        } else {
+          alert(result.message || '开始讨论失败');
+        }
       }
     } catch (error) {
       console.error('开始讨论失败:', error);
-      alert('开始讨论失败');
+      alert('开始讨论失败，请稍后重试');
     }
   };
 
@@ -338,27 +347,51 @@ export function GroupChatRoom() {
             {/* 房间参与者信息 */}
             {users.length > 0 && (
               <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-4">
-                <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center justify-between mb-3">
                   <span className="text-sm font-medium text-green-800">
                     👥 房间参与者 ({users.length}人)
                   </span>
-                  <span className="text-xs text-green-600">
+                  <span className="text-xs text-green-600 font-medium">
                     {users.filter(u => u.isReady).length}/{users.length} 已准备
                   </span>
                 </div>
-                <div className="flex flex-wrap gap-2">
+                <div className="space-y-2">
                   {users.map((user) => (
                     <div
                       key={user.id}
-                      className={`flex items-center gap-1 px-3 py-1 rounded-full text-sm ${
+                      className={`flex items-center justify-between px-4 py-2.5 rounded-lg transition-all ${
                         user.isReady
-                          ? 'bg-green-200 text-green-800'
-                          : 'bg-gray-200 text-gray-600'
+                          ? 'bg-green-100 border border-green-300'
+                          : 'bg-gray-100 border border-gray-300'
                       }`}
                     >
-                      <span>{user.avatar}</span>
-                      <span>{user.name}</span>
-                      {user.isReady && <span className="text-xs">✓</span>}
+                      <div className="flex items-center gap-2">
+                        <span className="text-lg">{user.avatar}</span>
+                        <div className="flex flex-col">
+                          <div className="flex items-center gap-2">
+                            <span className={`font-medium ${user.isReady ? 'text-green-900' : 'text-gray-700'}`}>
+                              {user.name}
+                            </span>
+                            {user.isCreator && (
+                              <span className="px-2 py-0.5 bg-orange-500 text-white text-xs rounded-full font-medium">
+                                群主
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        {user.isReady ? (
+                          <span className="flex items-center gap-1 text-green-700 text-sm font-medium">
+                            <span className="text-base">✓</span>
+                            已准备
+                          </span>
+                        ) : (
+                          <span className="text-gray-500 text-sm">
+                            未准备
+                          </span>
+                        )}
+                      </div>
                     </div>
                   ))}
                 </div>
@@ -370,8 +403,9 @@ export function GroupChatRoom() {
                   </div>
                 )}
                 {roomStatus === 'waiting' && (
-                  <p className="text-xs text-green-600 mt-2">
-                    等待其他成员准备...
+                  <p className="text-xs text-orange-600 mt-3 flex items-center gap-1">
+                    <span className="animate-pulse">⏳</span>
+                    等待所有成员准备...
                   </p>
                 )}
               </div>

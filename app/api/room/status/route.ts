@@ -42,11 +42,13 @@ export async function GET(request: NextRequest) {
           status: room.status,
           participantCount: room.participants.length,
           readyCount: room.participants.filter(p => p.isReady).length,
+          creatorId: room.createdBy, // 添加群主 ID
           isCreator: userId ? room.createdBy === userId : false,
           participants: room.participants.map(p => ({
             userId: p.userId,
             userName: p.userName,
             isReady: p.isReady,
+            isCreator: p.userId === room.createdBy, // 标记是否为群主
           })),
         }
       }
