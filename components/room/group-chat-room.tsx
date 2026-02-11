@@ -299,7 +299,7 @@ export function GroupChatRoom() {
                     <span className="text-xs text-blue-600">兴趣标签：</span>
                     {secondMeProfile.shades.slice(0, 5).map((shade: any) => (
                       <span key={shade.id} className="text-xs bg-blue-200 px-2 py-1 rounded ml-1">
-                        {shade.name}
+                        {shade.shadeIcon} {shade.shadeName}
                       </span>
                     ))}
                   </div>
@@ -309,7 +309,7 @@ export function GroupChatRoom() {
                     <span className="text-xs text-blue-600">饮食记忆：</span>
                     <div className="mt-1 text-xs text-blue-700">
                       {secondMeProfile.foodMemories.slice(0, 3).map((memory: any, idx: number) => (
-                        <div key={idx} className="mt-1">• {memory.content}</div>
+                        <div key={idx} className="mt-1">• {memory.factContent || memory.content}</div>
                       ))}
                     </div>
                   </div>
