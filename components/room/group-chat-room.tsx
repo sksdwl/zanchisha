@@ -145,7 +145,7 @@ export function GroupChatRoom() {
   }, []);
 
   // 邀请码验证成功
-  const handleInviteSuccess = (code: InviteCode) => {
+  const handleInviteSuccess = async (code: InviteCode) => {
     setInviteCode(code);
     setStep('profile');
 
@@ -156,10 +156,30 @@ export function GroupChatRoom() {
       localStorage.setItem('temp_user_id', userId);
     }
 
+    // 尝试从 SecondMe 获取用户真实姓名
+    let userName = '我'; // 默认值
+    try {
+      const sessionResponse = await fetch('/api/auth/session');
+      const session = await sessionResponse.json();
+
+      if (session.code === 0 && session.data.isLoggedIn) {
+        const userInfoResponse = await fetch('/api/secondme/user/info');
+        const userInfoResult = await userInfoResponse.json();
+
+        if (userInfoResult.code === 0 && userInfoResult.data) {
+          // 使用 SecondMe 的真实姓名
+          userName = userInfoResult.data.name || userInfoResult.data.nickname || '我';
+          console.log('[房间] 从 SecondMe 获取用户名:', userName);
+        }
+      }
+    } catch (error) {
+      console.warn('[房间] 获取 SecondMe 用户名失败，使用默认值:', error);
+    }
+
     // 添加当前用户到房间
     const newUser: RoomUser = {
       id: userId,
-      name: '我',
+      name: userName,
       avatar: '👤',
       isReady: false,
     };
