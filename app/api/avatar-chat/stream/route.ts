@@ -86,7 +86,7 @@ export async function POST(request: NextRequest) {
         controller.enqueue(encoder.encode(doneData));
 
         // 10. 更新房间状态
-        roomManager.completeDiscussion(inviteCode, session);
+        await unifiedRoomManager.completeDiscussion(inviteCode);
 
         console.log(`[SSE] Agent 讨论完成，房间: ${inviteCode}`);
         controller.close();
