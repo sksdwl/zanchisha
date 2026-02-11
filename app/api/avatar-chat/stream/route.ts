@@ -41,7 +41,24 @@ export async function POST(request: NextRequest) {
   const encoder = new TextEncoder();
   const stream = new ReadableStream({
     async start(controller) {
+      let heartbeatInterval: NodeJS.Timeout | null = null;
+
       try {
+        // 发送连接成功消息
+        const connectData = `data: ${JSON.stringify({ type: 'connected', message: '连接成功' })}\n\n`;
+        controller.enqueue(encoder.encode(connectData));
+
+        // 启动心跳机制（每 15 秒发送一次）
+        heartbeatInterval = setInterval(() => {
+          try {
+            const heartbeat = `: heartbeat ${Date.now()}\n\n`;
+            controller.enqueue(encoder.encode(heartbeat));
+          } catch (e) {
+            console.error('[SSE] 心跳发送失败:', e);
+            if (heartbeatInterval) clearInterval(heartbeatInterval);
+          }
+        }, 15000);
+
         // 3. 创建 LLM 客户端
         const llmClient = new DeepSeekClient();
 
@@ -69,8 +86,12 @@ export async function POST(request: NextRequest) {
 
         // 6. 监听消息事件，实时推送
         orchestrator.on('message', (message) => {
-          const data = `data: ${JSON.stringify({ type: 'message', data: message })}\n\n`;
-          controller.enqueue(encoder.encode(data));
+          try {
+            const data = `data: ${JSON.stringify({ type: 'message', data: message })}\n\n`;
+            controller.enqueue(encoder.encode(data));
+          } catch (e) {
+            console.error('[SSE] 消息推送失败:', e);
+          }
         });
 
         // 7. 运行讨论
@@ -89,15 +110,26 @@ export async function POST(request: NextRequest) {
         await unifiedRoomManager.completeDiscussion(inviteCode);
 
         console.log(`[SSE] Agent 讨论完成，房间: ${inviteCode}`);
+
+        // 清理心跳
+        if (heartbeatInterval) {
+          clearInterval(heartbeatInterval);
+        }
+
         controller.close();
       } catch (error: any) {
+        // 清理心跳
+        if (heartbeatInterval) {
+          clearInterval(heartbeatInterval);
+        }
+
         // 错误处理：降级到模拟对话
         console.error('[SSE] Agent 讨论失败，降级到模拟对话:', error);
 
-        const errorData = `data: ${JSON.stringify({ type: 'error', message: '正在使用备用方案...' })}\n\n`;
-        controller.enqueue(encoder.encode(errorData));
-
         try {
+          const errorData = `data: ${JSON.stringify({ type: 'error', message: '正在使用备用方案...' })}\n\n`;
+          controller.enqueue(encoder.encode(errorData));
+
           // 调用现有的模拟对话生成
           const { generateFullConversation } = await import('@/app/api/avatar-chat/complete/route');
           const { mergeProfiles } = await import('@/lib/ai-dish-analyzer');
@@ -130,12 +162,19 @@ export async function POST(request: NextRequest) {
           console.log(`[SSE] 模拟对话完成，房间: ${inviteCode}`);
         } catch (fallbackError: any) {
           console.error('[SSE] 模拟对话也失败:', fallbackError);
-          const errorData = `data: ${JSON.stringify({ type: 'error', message: '对话生成失败' })}\n\n`;
-          controller.enqueue(encoder.encode(errorData));
+          try {
+            const errorData = `data: ${JSON.stringify({ type: 'error', message: '对话生成失败' })}\n\n`;
+            controller.enqueue(encoder.encode(errorData));
+          } catch (e) {
+            console.error('[SSE] 无法发送错误消息:', e);
+          }
         }
 
         controller.close();
       }
+    },
+    cancel() {
+      console.log('[SSE] 客户端断开连接');
     }
   });
 

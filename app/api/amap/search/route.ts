@@ -18,8 +18,12 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // 搜索餐厅
+    console.log(`[API] 搜索餐厅: ${cuisine}, 位置: ${location || city || '默认'}`);
+
+    // 搜索餐厅（内部已有降级逻辑）
     const restaurant = await getRestaurantWithMap(cuisine, location || undefined);
+
+    console.log(`[API] 返回餐厅: ${restaurant.name}`);
 
     return NextResponse.json({
       code: 0,
@@ -27,9 +31,15 @@ export async function POST(request: NextRequest) {
     });
 
   } catch (error: any) {
-    console.error('餐厅搜索失败:', error);
+    console.error('[API] 餐厅搜索失败:', error.message);
+
+    // 返回友好的错误信息，但不暴露内部错误
     return NextResponse.json(
-      { code: 500, message: error.message || '搜索失败' },
+      {
+        code: 500,
+        message: '餐厅搜索暂时不可用，请稍后重试',
+        detail: process.env.NODE_ENV === 'development' ? error.message : undefined
+      },
       { status: 500 }
     );
   }
@@ -43,8 +53,12 @@ export async function GET(request: NextRequest) {
     const location = searchParams.get('location') || undefined;
     const city = searchParams.get('city') || '北京';
 
-    // 搜索餐厅列表
+    console.log(`[API] GET 搜索餐厅列表: ${cuisine}, 城市: ${city}`);
+
+    // 搜索餐厅列表（内部已有降级逻辑）
     const restaurants = await searchNearbyRestaurants(cuisine, location, city);
+
+    console.log(`[API] 返回 ${restaurants.length} 家餐厅`);
 
     return NextResponse.json({
       code: 0,
@@ -55,9 +69,13 @@ export async function GET(request: NextRequest) {
     });
 
   } catch (error: any) {
-    console.error('餐厅搜索失败:', error);
+    console.error('[API] 餐厅列表搜索失败:', error.message);
     return NextResponse.json(
-      { code: 500, message: error.message || '搜索失败' },
+      {
+        code: 500,
+        message: '餐厅搜索暂时不可用，请稍后重试',
+        detail: process.env.NODE_ENV === 'development' ? error.message : undefined
+      },
       { status: 500 }
     );
   }

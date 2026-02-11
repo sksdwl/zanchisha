@@ -76,7 +76,7 @@ export function AvatarChatVisual({ participants, onClose, roomName = 'AI 讨论�
     }
   };
 
-  // 开始 AI 分身对话（使用 SSE 流式传输）
+  // 开始 AI 分身对话（使用 SSE 流式传输，带重连机制）
   const startChat = async () => {
     setIsLoading(true);
 
@@ -98,77 +98,142 @@ export function AvatarChatVisual({ participants, onClose, roomName = 'AI 讨论�
     };
     setSession(initialSession);
 
-    try {
-      // 使用 SSE 流式接收消息
-      const response = await fetch('/api/avatar-chat/stream', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ inviteCode }),
-      });
+    let retryCount = 0;
+    const maxRetries = 3;
+    const retryDelay = 2000;
 
-      if (!response.ok) {
-        throw new Error('启动讨论失败');
-      }
+    const attemptConnection = async (): Promise<void> => {
+      try {
+        console.log(`[SSE] 尝试连接 (${retryCount + 1}/${maxRetries + 1})`);
 
-      const reader = response.body?.getReader();
-      const decoder = new TextDecoder();
+        // 使用 AbortController 实现超时控制
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 120000); // 120秒超时
 
-      if (!reader) {
-        throw new Error('无法读取响应流');
-      }
+        const response = await fetch('/api/avatar-chat/stream', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ inviteCode }),
+          signal: controller.signal,
+        });
 
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
+        clearTimeout(timeoutId);
 
-        const chunk = decoder.decode(value);
-        const lines = chunk.split('\n');
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}: 启动讨论失败`);
+        }
 
-        for (const line of lines) {
-          if (line.startsWith('data: ')) {
-            try {
-              const data = JSON.parse(line.slice(6));
+        const reader = response.body?.getReader();
+        const decoder = new TextDecoder();
 
-              if (data.type === 'message') {
-                // 添加新消息
-                setSession(prev => {
-                  if (!prev) return prev;
-                  return {
-                    ...prev,
-                    messages: [...prev.messages, data.data],
-                  };
-                });
-                // 自动增加可见消息数
-                setVisibleMessages(prev => prev + 1);
-              } else if (data.type === 'recommendation') {
-                // 设置推荐结果
-                setSession(prev => {
-                  if (!prev) return prev;
-                  return {
-                    ...prev,
-                    recommendation: data.data,
-                    status: 'reached_consensus',
-                  };
-                });
+        if (!reader) {
+          throw new Error('无法读取响应流');
+        }
 
-                // 保存讨论结果到 SecondMe
-                saveDiscussionToSecondMe(data.data);
-              } else if (data.type === 'done') {
-                setIsLoading(false);
-              } else if (data.type === 'error') {
-                console.warn('SSE 错误:', data.message);
+        let buffer = '';
+
+        while (true) {
+          const { done, value } = await reader.read();
+
+          if (done) {
+            console.log('[SSE] 流结束');
+            break;
+          }
+
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split('\n');
+
+          // 保留最后一个不完整的行
+          buffer = lines.pop() || '';
+
+          for (const line of lines) {
+            if (line.startsWith('data: ')) {
+              try {
+                const data = JSON.parse(line.slice(6));
+
+                if (data.type === 'message') {
+                  setSession(prev => {
+                    if (!prev) return prev;
+                    return {
+                      ...prev,
+                      messages: [...prev.messages, data.data],
+                    };
+                  });
+                  setVisibleMessages(prev => prev + 1);
+                } else if (data.type === 'recommendation') {
+                  setSession(prev => {
+                    if (!prev) return prev;
+                    return {
+                      ...prev,
+                      recommendation: data.data,
+                      status: 'reached_consensus',
+                    };
+                  });
+                  saveDiscussionToSecondMe(data.data);
+                } else if (data.type === 'done') {
+                  setIsLoading(false);
+                  console.log('[SSE] 讨论完成');
+                } else if (data.type === 'error') {
+                  console.warn('[SSE] 服务器错误:', data.message);
+                }
+              } catch (e) {
+                console.error('[SSE] 解析数据失败:', line, e);
               }
-            } catch (e) {
-              console.error('解析 SSE 数据失败:', e);
             }
           }
         }
+
+        // 成功完成，重置重试计数
+        retryCount = 0;
+
+      } catch (error: any) {
+        console.error('[SSE] 连接失败:', error);
+
+        // 判断是否应该重试
+        const isNetworkError = error.name === 'TypeError' ||
+                              error.message.includes('network') ||
+                              error.message.includes('fetch') ||
+                              error.name === 'AbortError';
+
+        if (isNetworkError && retryCount < maxRetries) {
+          retryCount++;
+          console.log(`[SSE] ${retryDelay}ms 后重试...`);
+
+          // 显示重试提示
+          setSession(prev => {
+            if (!prev) return prev;
+            return {
+              ...prev,
+              messages: [
+                ...prev.messages,
+                {
+                  id: `retry_${Date.now()}`,
+                  userId: 'system',
+                  userName: '系统',
+                  avatarName: '系统提示',
+                  content: `网络连接中断，正在重试 (${retryCount}/${maxRetries})...`,
+                  type: 'suggestion',
+                  timestamp: Date.now(),
+                }
+              ],
+            };
+          });
+
+          await new Promise(resolve => setTimeout(resolve, retryDelay));
+          return attemptConnection();
+        } else {
+          // 达到最大重试次数或非网络错误
+          const errorMsg = error.name === 'AbortError'
+            ? '请求超时，请检查网络连接'
+            : `连接失败: ${error.message}`;
+
+          alert(`AI 分身对话失败：${errorMsg}\n\n${retryCount >= maxRetries ? '已达到最大重试次数' : ''}`);
+          setIsLoading(false);
+        }
       }
-    } catch (error: any) {
-      console.error('AI 分身对话失败:', error);
-      alert('AI 分身对话失败：' + error.message);
-      setIsLoading(false);
-    }
+    };
+
+    await attemptConnection();
   };
 
   // 打字机效果：显示正在输入的提示

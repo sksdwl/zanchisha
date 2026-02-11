@@ -35,6 +35,45 @@ const AMAP_KEY = process.env.NEXT_PUBLIC_AMAP_KEY || ''; // 需要申请的高�
 const AMAP_WEB_KEY = process.env.AMAP_WEB_KEY || ''; // 服务端使用的Key
 
 /**
+ * 带超时和重试的 fetch 请求
+ */
+async function fetchWithTimeout(
+  url: string,
+  options: RequestInit = {},
+  timeout: number = 5000,
+  retries: number = 2
+): Promise<Response> {
+  for (let i = 0; i <= retries; i++) {
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), timeout);
+
+      const response = await fetch(url, {
+        ...options,
+        signal: controller.signal,
+      });
+
+      clearTimeout(timeoutId);
+      return response;
+    } catch (error: any) {
+      const isLastAttempt = i === retries;
+      const isTimeout = error.name === 'AbortError' || error.code === 'UND_ERR_CONNECT_TIMEOUT';
+
+      console.warn(`[Amap] 请求失败 (${i + 1}/${retries + 1}):`, error.message);
+
+      if (isLastAttempt || !isTimeout) {
+        throw error;
+      }
+
+      // 等待后重试
+      await new Promise(resolve => setTimeout(resolve, 1000 * (i + 1)));
+    }
+  }
+
+  throw new Error('请求失败');
+}
+
+/**
  * 搜索附近的餐厅
  * @param keywords 关键词，如"川菜"、"火锅"
  * @param location 位置，格式"经度,纬度"，不传则使用城市搜索
@@ -50,9 +89,9 @@ export async function searchNearbyRestaurants(
   try {
     // 优先使用服务端Key，更安全
     const key = AMAP_WEB_KEY || AMAP_KEY;
-    
+
     if (!key) {
-      console.warn('高德地图API Key未配置，使用模拟数据');
+      console.warn('[Amap] API Key未配置，使用模拟数据');
       return getMockRestaurants(keywords);
     }
 
@@ -74,15 +113,18 @@ export async function searchNearbyRestaurants(
       params.append('city', city);
     }
 
-    const url = location 
+    const url = location
       ? `https://restapi.amap.com/v3/place/around?${params.toString()}`
       : `https://restapi.amap.com/v3/place/text?${params.toString()}`;
 
-    const response = await fetch(url);
+    console.log(`[Amap] 搜索餐厅: ${keywords}, 位置: ${location || city || '默认'}`);
+
+    // 使用带超时和重试的请求（5秒超时，重试2次）
+    const response = await fetchWithTimeout(url, {}, 5000, 2);
     const data: AmapSearchResponse = await response.json();
 
     if (data.status === '1' && data.pois) {
-      return data.pois.filter(poi => 
+      const filtered = data.pois.filter(poi =>
         // 过滤掉非餐厅类型的POI
         poi.typecode?.startsWith('0501') || // 中餐厅
         poi.typecode?.startsWith('0502') || // 外国餐厅
@@ -90,12 +132,15 @@ export async function searchNearbyRestaurants(
         poi.typecode?.startsWith('0504') || // 休闲餐饮
         poi.typecode?.startsWith('0505')    // 咖啡厅/茶馆
       );
+
+      console.log(`[Amap] 找到 ${filtered.length} 家餐厅`);
+      return filtered;
     }
 
-    console.warn('高德地图API返回异常，使用模拟数据');
+    console.warn('[Amap] API返回异常，使用模拟数据:', data.info);
     return getMockRestaurants(keywords);
-  } catch (error) {
-    console.error('高德地图搜索失败:', error);
+  } catch (error: any) {
+    console.error('[Amap] 搜索失败，降级到模拟数据:', error.message);
     return getMockRestaurants(keywords);
   }
 }
@@ -271,22 +316,31 @@ export async function getRestaurantWithMap(
   staticMapUrl: string;
   location: string;
 }> {
-  const result = await getRealRestaurantRecommendation(cuisine, location);
-  
-  if (!result.restaurant) {
-    throw new Error('未找到合适的餐厅');
-  }
+  try {
+    console.log(`[Amap] 获取餐厅详情: ${cuisine}, 位置: ${location || '默认'}`);
 
-  const poi = result.restaurant;
-  
-  return {
-    name: poi.name,
-    address: poi.address,
-    rating: poi.biz_ext?.rating || '4.0',
-    cost: poi.biz_ext?.cost || '50',
-    tel: poi.tel || '暂无电话',
-    mapUrl: result.mapUrl,
-    staticMapUrl: generateStaticMapUrl(poi.location, poi.name),
-    location: poi.location,
-  };
+    const result = await getRealRestaurantRecommendation(cuisine, location);
+
+    if (!result.restaurant) {
+      console.warn('[Amap] 未找到餐厅，使用模拟数据');
+      throw new Error('未找到合适的餐厅');
+    }
+
+    const poi = result.restaurant;
+    console.log(`[Amap] 找到餐厅: ${poi.name}, 评分: ${poi.biz_ext?.rating || '无'}`);
+
+    return {
+      name: poi.name,
+      address: poi.address,
+      rating: poi.biz_ext?.rating || '4.0',
+      cost: poi.biz_ext?.cost || '50',
+      tel: poi.tel || '暂无电话',
+      mapUrl: result.mapUrl,
+      staticMapUrl: generateStaticMapUrl(poi.location, poi.name),
+      location: poi.location,
+    };
+  } catch (error: any) {
+    console.error('[Amap] 获取餐厅详情失败:', error.message);
+    throw error;
+  }
 }
