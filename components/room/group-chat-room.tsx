@@ -26,8 +26,60 @@ export function GroupChatRoom() {
   const [secondMeProfile, setSecondMeProfile] = useState<any>(null);
   const [additionalInfo, setAdditionalInfo] = useState<string>('');
 
-  // 加载 SecondMe 用户信息和饮食偏好
+  // 轮询房间状态，实时更新参与者列表
   React.useEffect(() => {
+    if (!inviteCode || !currentUser || step !== 'profile') {
+      return;
+    }
+
+    console.log('[房间轮询] 开始轮询房间状态...');
+
+    const pollRoomStatus = async () => {
+      try {
+        const response = await fetch(
+          `/api/room/status?inviteCode=${inviteCode.code}&userId=${currentUser.id}`
+        );
+        const result = await response.json();
+
+        if (result.code === 0 && result.data.exists) {
+          const room = result.data.room;
+          console.log('[房间轮询] 房间状态:', room);
+
+          // 更新房间状态
+          setRoomStatus(room.status);
+          setIsCreator(room.isCreator);
+
+          // 更新参与者列表
+          const updatedUsers = room.participants.map((p: any) => ({
+            id: p.userId,
+            name: p.userName,
+            avatar: '👤',
+            isReady: p.isReady,
+          }));
+          setUsers(updatedUsers);
+
+          // 如果房间状态变为 discussing，自动进入聊天
+          if (room.status === 'discussing' && step === 'profile') {
+            console.log('[房间轮询] 房间已开始讨论，进入聊天页面');
+            setStep('chat');
+          }
+        }
+      } catch (error) {
+        console.error('[房间轮询] 获取房间状态失败:', error);
+      }
+    };
+
+    // 立即执行一次
+    pollRoomStatus();
+
+    // 每 2 秒轮询一次
+    const interval = setInterval(pollRoomStatus, 2000);
+
+    return () => {
+      console.log('[房间轮询] 停止轮询');
+      clearInterval(interval);
+    };
+  }, [inviteCode, currentUser, step]);
     const loadSecondMeProfile = async () => {
       try {
         console.log('[SecondMe] 开始加载用户画像...');
@@ -279,6 +331,48 @@ export function GroupChatRoom() {
               <br />
               请先输入你喜欢的菜品
             </p>
+
+            {/* 房间参与者信息 */}
+            {users.length > 0 && (
+              <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-4">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-sm font-medium text-green-800">
+                    👥 房间参与者 ({users.length}人)
+                  </span>
+                  <span className="text-xs text-green-600">
+                    {users.filter(u => u.isReady).length}/{users.length} 已准备
+                  </span>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {users.map((user) => (
+                    <div
+                      key={user.id}
+                      className={`flex items-center gap-1 px-3 py-1 rounded-full text-sm ${
+                        user.isReady
+                          ? 'bg-green-200 text-green-800'
+                          : 'bg-gray-200 text-gray-600'
+                      }`}
+                    >
+                      <span>{user.avatar}</span>
+                      <span>{user.name}</span>
+                      {user.isReady && <span className="text-xs">✓</span>}
+                    </div>
+                  ))}
+                </div>
+                {roomStatus === 'ready' && isCreator && (
+                  <div className="mt-3 pt-3 border-t border-green-300">
+                    <p className="text-xs text-green-700 mb-2">
+                      ✅ 所有人已准备，你可以开始讨论了
+                    </p>
+                  </div>
+                )}
+                {roomStatus === 'waiting' && (
+                  <p className="text-xs text-green-600 mt-2">
+                    等待其他成员准备...
+                  </p>
+                )}
+              </div>
+            )}
 
             {/* SecondMe 信息展示 - 调试版本 */}
             {(() => {
