@@ -18,6 +18,8 @@ interface AvatarChatVisualProps {
   onClose: () => void;
   roomName?: string;
   inviteCode?: string;
+  currentUserId?: string; // 当前用户ID，用于判断是否为房主
+  isCreator?: boolean; // 是否为房主
 }
 
 // AI 分身头像颜色配置
@@ -35,7 +37,7 @@ const getParticipantColor = (index: number) => {
   return AVATAR_COLORS[index % AVATAR_COLORS.length];
 };
 
-export function AvatarChatVisual({ participants, onClose, roomName = 'AI 讨论群', inviteCode }: AvatarChatVisualProps) {
+export function AvatarChatVisual({ participants, onClose, roomName = 'AI 讨论群', inviteCode, currentUserId, isCreator = false }: AvatarChatVisualProps) {
   const [session, setSession] = useState<AvatarChatSession | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [visibleMessages, setVisibleMessages] = useState<number>(0);
@@ -43,6 +45,8 @@ export function AvatarChatVisual({ participants, onClose, roomName = 'AI 讨论�
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const chatContainerRef = useRef<HTMLDivElement>(null);
   const hasAutoStarted = useRef(false); // 防止重复自动启动
+  const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null); // 轮询定时器
+  const lastMessageCountRef = useRef<number>(0); // 上次消息数量
 
   // 保存讨论结果到 SecondMe
   const saveDiscussionToSecondMe = async (recommendation: RestaurantRecommendation) => {
@@ -254,6 +258,94 @@ export function AvatarChatVisual({ participants, onClose, roomName = 'AI 讨论�
     await attemptConnection();
   };
 
+  // 轮询获取消息（非房主成员使用）
+  const startPolling = async () => {
+    if (!inviteCode) return;
+
+    console.log('[AvatarChat] 非房主成员，启动轮询模式');
+    setIsLoading(true);
+
+    // 初始化 session
+    const initialSession: AvatarChatSession = {
+      id: `session-${Date.now()}`,
+      participants: participants.map((p, index) => ({
+        userId: p.userId,
+        userName: p.userName,
+        avatarName: `${p.userName}的美食向导`,
+        avatarPersonality: '',
+        tasteProfile: p.tasteProfile,
+        isOnline: true,
+        color: getParticipantColor(index)
+      })),
+      messages: [],
+      status: 'ongoing',
+      recommendation: undefined,
+      createdAt: Date.now(),
+      updatedAt: Date.now()
+    };
+    setSession(initialSession);
+    setIsLoading(false);
+
+    // 开始轮询
+    const pollMessages = async () => {
+      try {
+        const response = await fetch(
+          `/api/room/messages?inviteCode=${inviteCode}&lastMessageIndex=${lastMessageCountRef.current}`
+        );
+        const result = await response.json();
+
+        if (result.code === 0) {
+          const { messages: newMessages, status, recommendation } = result.data;
+
+          // 如果有新消息，添加到 session
+          if (newMessages && newMessages.length > 0) {
+            setSession(prev => {
+              if (!prev) return prev;
+              return {
+                ...prev,
+                messages: [...prev.messages, ...newMessages],
+                recommendation: recommendation || prev.recommendation
+              };
+            });
+            lastMessageCountRef.current += newMessages.length;
+          }
+
+          // 如果讨论已完成，停止轮询
+          if (status === 'completed') {
+            console.log('[AvatarChat] 讨论已完成，停止轮询');
+            if (pollingIntervalRef.current) {
+              clearInterval(pollingIntervalRef.current);
+              pollingIntervalRef.current = null;
+            }
+
+            // 保存到 SecondMe
+            if (recommendation) {
+              await saveDiscussionToSecondMe(recommendation);
+            }
+          }
+        }
+      } catch (error) {
+        console.error('[AvatarChat] 轮询消息失败:', error);
+      }
+    };
+
+    // 立即执行一次
+    await pollMessages();
+
+    // 每 500ms 轮询一次
+    pollingIntervalRef.current = setInterval(pollMessages, 500);
+  };
+
+  // 清理轮询
+  useEffect(() => {
+    return () => {
+      if (pollingIntervalRef.current) {
+        clearInterval(pollingIntervalRef.current);
+        pollingIntervalRef.current = null;
+      }
+    };
+  }, []);
+
   // 打字机效果：显示正在输入的提示
   useEffect(() => {
     if (session && visibleMessages < session.messages.length) {
@@ -281,9 +373,17 @@ export function AvatarChatVisual({ participants, onClose, roomName = 'AI 讨论�
     if (inviteCode && !session && !isLoading && !hasAutoStarted.current) {
       console.log('[AvatarChat] 检测到 inviteCode，自动启动讨论');
       hasAutoStarted.current = true;
-      startChat();
+
+      // 根据是否为房主选择不同的模式
+      if (isCreator) {
+        console.log('[AvatarChat] 房主模式：使用 SSE 连接');
+        startChat();
+      } else {
+        console.log('[AvatarChat] 成员模式：使用轮询');
+        startPolling();
+      }
     }
-  }, [inviteCode]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [inviteCode, isCreator]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // 获取当前正在输入的参与者
   const getCurrentTypingParticipant = () => {

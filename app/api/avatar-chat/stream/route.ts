@@ -10,6 +10,7 @@ import { FoodDiscussionAgent } from '@/lib/ai-agent';
 import { AgentOrchestrator } from '@/lib/agent-orchestrator';
 import { unifiedRoomManager } from '@/lib/room-manager-unified';
 import { generateAvatarPersonality } from '@/lib/ai-avatar-chat';
+import { roomMessagesKV } from '@/lib/room-messages-kv';
 
 export async function POST(request: NextRequest) {
   const { inviteCode } = await request.json();
@@ -44,6 +45,9 @@ export async function POST(request: NextRequest) {
       let heartbeatInterval: NodeJS.Timeout | null = null;
 
       try {
+        // 初始化消息存储
+        await roomMessagesKV.init(inviteCode);
+
         // 发送连接成功消息
         const connectData = `data: ${JSON.stringify({ type: 'connected', message: '连接成功' })}\n\n`;
         controller.enqueue(encoder.encode(connectData));
@@ -84,11 +88,16 @@ export async function POST(request: NextRequest) {
         const maxRounds = parseInt(process.env.AGENT_MAX_ROUNDS || '5');
         const orchestrator = new AgentOrchestrator(agents, { maxRounds });
 
-        // 6. 监听消息事件，实时推送
+        // 6. 监听消息事件，实时推送并存储到 KV
         orchestrator.on('message', (message) => {
           try {
             const data = `data: ${JSON.stringify({ type: 'message', data: message })}\n\n`;
             controller.enqueue(encoder.encode(data));
+
+            // 存储消息到 KV
+            roomMessagesKV.addMessage(inviteCode, message).catch(err => {
+              console.error('[SSE] 存储消息失败:', err);
+            });
           } catch (e) {
             console.error('[SSE] 消息推送失败:', e);
           }
@@ -98,13 +107,17 @@ export async function POST(request: NextRequest) {
         console.log(`[SSE] 开始 Agent 讨论，房间: ${inviteCode}, 参与者: ${agents.length}`);
         const session = await orchestrator.runDiscussion();
 
-        // 8. 推送最终推荐
-        const finalData = `data: ${JSON.stringify({ type: 'recommendation', data: session.recommendation })}\n\n`;
-        controller.enqueue(encoder.encode(finalData));
+        // 8. 推送最终推荐并存储到 KV
+        if (session.recommendation) {
+          const finalData = `data: ${JSON.stringify({ type: 'recommendation', data: session.recommendation })}\n\n`;
+          controller.enqueue(encoder.encode(finalData));
+          await roomMessagesKV.setRecommendation(inviteCode, session.recommendation);
+        }
 
-        // 9. 推送完成信号
+        // 9. 推送完成信号并标记完成
         const doneData = `data: ${JSON.stringify({ type: 'done' })}\n\n`;
         controller.enqueue(encoder.encode(doneData));
+        await roomMessagesKV.markCompleted(inviteCode);
 
         // 10. 更新房间状态为已完成
         await unifiedRoomManager.completeDiscussion(inviteCode);

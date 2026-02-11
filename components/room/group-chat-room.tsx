@@ -580,6 +580,8 @@ export function GroupChatRoom() {
               tasteProfile: u.tasteProfile!,
             }))}
             inviteCode={inviteCode?.code}
+            currentUserId={currentUser.id}
+            isCreator={isCreator}
             onClose={handleBack}
           />
         )}
