@@ -155,7 +155,7 @@ export async function POST(request: NextRequest) {
           controller.enqueue(encoder.encode(errorData));
 
           // 调用现有的模拟对话生成
-          const { generateFullConversation } = await import('@/app/api/avatar-chat/complete/route');
+          const { generateFullConversation, generateRecommendation } = await import('@/app/api/avatar-chat/complete/route');
           const { mergeProfiles } = await import('@/lib/ai-dish-analyzer');
 
           const participants = room.participants
@@ -178,6 +178,11 @@ export async function POST(request: NextRequest) {
             controller.enqueue(encoder.encode(data));
             await new Promise(resolve => setTimeout(resolve, 500));
           }
+
+          // 生成并推送推荐
+          const recommendation = generateRecommendation(participants, merged);
+          const recommendationData = `data: ${JSON.stringify({ type: 'recommendation', data: recommendation })}\n\n`;
+          controller.enqueue(encoder.encode(recommendationData));
 
           // 推送完成信号
           const doneData = `data: ${JSON.stringify({ type: 'done' })}\n\n`;

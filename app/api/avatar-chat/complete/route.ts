@@ -206,7 +206,7 @@ export function generateFullConversation(
 }
 
 // 生成餐厅推荐
-function generateRecommendation(
+export function generateRecommendation(
   participants: AvatarParticipant[],
   merged: ReturnType<typeof mergeProfiles>
 ): RestaurantRecommendation {
