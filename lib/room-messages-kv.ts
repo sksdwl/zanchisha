@@ -22,12 +22,12 @@ const EXPIRY_TIME = 3600 * 1000; // 1小时
 
 function cleanupExpiredRooms() {
   const now = Date.now();
-  for (const [key, data] of memoryStore.entries()) {
+  memoryStore.forEach((data, key) => {
     if (now - data.updatedAt > EXPIRY_TIME) {
       memoryStore.delete(key);
       console.log(`[RoomMessagesMemory] 自动清理过期房间: ${data.inviteCode}`);
     }
-  }
+  });
 }
 
 // 每10分钟清理一次过期数据
