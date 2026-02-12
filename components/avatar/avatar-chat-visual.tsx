@@ -391,6 +391,20 @@ export function AvatarChatVisual({ participants, onClose, roomName = 'AI 讨论�
     return session.participants.find(p => p.userId === currentTypingId) ?? null;
   };
 
+  // 视图状态：discussion（仅讨论）、split（分屏）、recommendation（仅推荐）
+  const [viewMode, setViewMode] = useState<'discussion' | 'split' | 'recommendation'>('discussion');
+
+  // 当讨论完成且有推荐时，自动切换到分屏视图
+  useEffect(() => {
+    if (session && visibleMessages >= session.messages.length && session.recommendation && !isLoading) {
+      // 延迟 1 秒后切换到分屏视图
+      const timer = setTimeout(() => {
+        setViewMode('split');
+      }, 1000);
+      return () => clearTimeout(timer);
+    }
+  }, [session, visibleMessages, isLoading]);
+
   if (!session) {
     return (
       <div className="bg-white rounded-3xl shadow-2xl p-8 text-center max-w-md mx-auto">
@@ -503,93 +517,174 @@ export function AvatarChatVisual({ participants, onClose, roomName = 'AI 讨论�
         </div>
       </div>
 
-      {/* 聊天内容区 */}
-      <div 
-        ref={chatContainerRef}
-        className="flex-1 overflow-y-auto p-4 space-y-4 bg-gradient-to-b from-gray-50 to-white"
-      >
-        {/* 系统提示 */}
-        <div className="text-center">
-          <span className="inline-block px-4 py-1.5 bg-gray-200 text-gray-600 text-xs rounded-full">
-            🤖 AI 分身已就位，开始讨论吃什么
-          </span>
-        </div>
+      {/* 主内容区 - 根据视图模式切换 */}
+      {viewMode === 'discussion' ? (
+        // 仅讨论视图
+        <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-gradient-to-b from-gray-50 to-white">
+          {/* 系统提示 */}
+          <div className="text-center">
+            <span className="inline-block px-4 py-1.5 bg-gray-200 text-gray-600 text-xs rounded-full">
+              🤖 AI 分身已就位，开始讨论吃什么
+            </span>
+          </div>
 
-        {/* 消息列表 */}
-        {session.messages.slice(0, visibleMessages).map((msg, index) => {
-          const participantIndex = session.participants.findIndex(p => p.userId === msg.userId);
-          // 如果找不到参与者，使用默认索引 0
-          const safeIndex = participantIndex >= 0 ? participantIndex : 0;
-          const color = getParticipantColor(safeIndex);
-          const isMe = participantIndex === 0; // 第一个参与者显示在右边
+          {/* 消息列表 */}
+          {session.messages.slice(0, visibleMessages).map((msg, index) => {
+            const participantIndex = session.participants.findIndex(p => p.userId === msg.userId);
+            const safeIndex = participantIndex >= 0 ? participantIndex : 0;
+            const color = getParticipantColor(safeIndex);
+            // 第一个参与者（自己）在右边，其他人在左边
+            const isMe = participantIndex === 0;
 
-          return (
-            <MessageBubble
-              key={msg.id}
-              message={msg}
-              color={color}
-              isRight={!isMe} // 交替显示左右
-              index={safeIndex}
+            return (
+              <MessageBubble
+                key={msg.id}
+                message={msg}
+                color={color}
+                isRight={isMe}
+                index={safeIndex}
+              />
+            );
+          })}
+
+          {/* 正在输入提示 */}
+          {currentTypingId && (
+            <TypingIndicator
+              participant={getCurrentTypingParticipant()}
+              color={getParticipantColor(session.participants.findIndex(p => p.userId === currentTypingId))}
             />
-          );
-        })}
-        
-        {/* 正在输入提示 */}
-        {currentTypingId && (
-          <TypingIndicator 
-            participant={getCurrentTypingParticipant()} 
-            color={getParticipantColor(session.participants.findIndex(p => p.userId === currentTypingId))}
-          />
-        )}
-        
-        <div ref={messagesEndRef} />
-      </div>
+          )}
 
-      {/* 底部推荐结果 */}
-      {visibleMessages >= session.messages.length && session.recommendation && (
-        <RecommendationResult recommendation={session.recommendation} />
+          <div ref={messagesEndRef} />
+
+          {/* 讨论完成提示 */}
+          {visibleMessages >= session.messages.length && session.recommendation && !isLoading && (
+            <div className="text-center py-4 animate-fade-in">
+              <div className="inline-block px-6 py-3 bg-gradient-to-r from-green-500 to-emerald-500 text-white rounded-full shadow-lg">
+                <span className="text-lg">✨ AI 分身达成共识！正在为您呈现推荐...</span>
+              </div>
+            </div>
+          )}
+        </div>
+      ) : viewMode === 'split' ? (
+        // 分屏视图：左侧讨论，右侧推荐
+        <div className="flex-1 flex gap-4 p-4 overflow-hidden">
+          {/* 左侧：讨论内容 */}
+          <div className="flex-1 flex flex-col bg-white rounded-2xl shadow-lg overflow-hidden">
+            <div className="px-4 py-3 bg-gradient-to-r from-blue-500 to-purple-500 text-white flex items-center justify-between">
+              <h3 className="font-bold flex items-center gap-2">
+                <span>💬</span>
+                <span>讨论过程</span>
+              </h3>
+              <button
+                onClick={() => setViewMode('recommendation')}
+                className="text-xs px-3 py-1 bg-white/20 hover:bg-white/30 rounded-full transition-all"
+              >
+                仅看推荐 →
+              </button>
+            </div>
+            <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-gradient-to-b from-gray-50 to-white">
+              {session.messages.map((msg, index) => {
+                const participantIndex = session.participants.findIndex(p => p.userId === msg.userId);
+                const safeIndex = participantIndex >= 0 ? participantIndex : 0;
+                const color = getParticipantColor(safeIndex);
+                // 第一个参与者（自己）在右边，其他人在左边
+                const isMe = participantIndex === 0;
+
+                return (
+                  <MessageBubble
+                    key={msg.id}
+                    message={msg}
+                    color={color}
+                    isRight={isMe}
+                    index={safeIndex}
+                  />
+                );
+              })}
+            </div>
+          </div>
+
+          {/* 右侧：推荐结果 */}
+          <div className="flex-1 flex flex-col bg-gradient-to-br from-orange-50 via-amber-50 to-yellow-50 rounded-2xl shadow-lg overflow-hidden">
+            <div className="px-4 py-3 bg-gradient-to-r from-green-500 to-emerald-500 text-white flex items-center justify-between">
+              <h3 className="font-bold flex items-center gap-2">
+                <span>🎉</span>
+                <span>推荐结果</span>
+              </h3>
+              <button
+                onClick={() => setViewMode('discussion')}
+                className="text-xs px-3 py-1 bg-white/20 hover:bg-white/30 rounded-full transition-all"
+              >
+                ← 仅看讨论
+              </button>
+            </div>
+            <div className="flex-1 overflow-y-auto">
+              <RecommendationResultCompact
+                recommendation={session.recommendation!}
+                participants={session.participants}
+              />
+            </div>
+          </div>
+        </div>
+      ) : (
+        // 仅推荐视图
+        <div className="flex-1 overflow-y-auto">
+          <RecommendationResultFullScreen
+            recommendation={session.recommendation!}
+            participants={session.participants}
+            onViewDiscussion={() => setViewMode('split')}
+          />
+        </div>
       )}
     </div>
   );
 }
 
 // 消息气泡组件
-function MessageBubble({ 
-  message, 
-  color, 
+function MessageBubble({
+  message,
+  color,
   isRight,
   index
-}: { 
-  message: AvatarMessage; 
+}: {
+  message: AvatarMessage;
   color: typeof AVATAR_COLORS[0];
   isRight: boolean;
   index: number;
 }) {
   return (
-    <div className={`flex items-end gap-2 ${isRight ? 'flex-row-reverse' : ''} animate-message-appear`}>
+    <div className={`flex items-start gap-2 ${isRight ? 'flex-row-reverse' : ''} animate-message-appear`}>
       {/* 头像 */}
-      <div className="flex flex-col items-center gap-1">
+      <div className="flex flex-col items-center gap-1 flex-shrink-0">
         <div className={`w-10 h-10 rounded-full bg-gradient-to-br ${color.bg} flex items-center justify-center text-white text-sm font-bold shadow-md`}>
           {message.userName[0]}
         </div>
         <span className="text-[10px] text-gray-400 max-w-[60px] truncate">
-          {message.avatarName.split('的')[0]}AI
+          {message.avatarName.split('的')[0]}
         </span>
       </div>
-      
+
       {/* 气泡 */}
       <div className={`max-w-[70%] ${isRight ? 'items-end' : 'items-start'} flex flex-col`}>
-        <div 
+        {/* 用户名（仅左侧显示） */}
+        {!isRight && (
+          <span className="text-xs text-gray-500 mb-1 px-2">
+            {message.userName}
+          </span>
+        )}
+
+        <div
           className={`
             px-4 py-3 rounded-2xl shadow-sm
-            ${isRight 
-              ? `${color.bubble} rounded-br-md` 
-              : 'bg-white text-gray-800 border border-gray-200 rounded-bl-md'
+            ${isRight
+              ? 'bg-gradient-to-br from-green-400 to-green-500 text-white rounded-tr-sm'
+              : 'bg-white text-gray-800 border border-gray-200 rounded-tl-sm'
             }
           `}
         >
-          <p className="text-sm leading-relaxed">{message.content}</p>
+          <p className="text-sm leading-relaxed break-words">{message.content}</p>
         </div>
+
         {/* 消息类型标签 */}
         <span className={`text-[10px] mt-1 px-2 py-0.5 rounded-full ${getTypeStyle(message.type)}`}>
           {getTypeLabel(message.type)}
@@ -638,7 +733,500 @@ interface AmapRestaurantInfo {
   location: string;
 }
 
-// 推荐结果组件
+// 紧凑版推荐结果组件（用于分屏显示）
+function RecommendationResultCompact({
+  recommendation,
+  participants,
+}: {
+  recommendation: RestaurantRecommendation;
+  participants: AvatarParticipant[];
+}) {
+  const [restaurant, setRestaurant] = useState<AmapRestaurantInfo | null>(null);
+  const [loading, setLoading] = useState(false);
+  const priceSymbols = '¥'.repeat(recommendation.priceLevel);
+
+  // 搜索高德地图餐厅
+  useEffect(() => {
+    const searchRestaurant = async () => {
+      setLoading(true);
+      try {
+        const response = await fetch('/api/amap/search', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            cuisine: recommendation.cuisine,
+            city: '北京'
+          }),
+        });
+
+        const result = await response.json();
+        if (result.code === 0 && result.data) {
+          setRestaurant(result.data);
+        }
+      } catch (error) {
+        console.error('搜索餐厅失败:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    searchRestaurant();
+  }, [recommendation.cuisine]);
+
+  return (
+    <div className="p-4 space-y-4 animate-fade-in">
+      {loading ? (
+        <div className="text-center py-8">
+          <div className="animate-spin rounded-full h-10 w-10 border-b-3 border-orange-500 mx-auto mb-3"></div>
+          <p className="text-sm text-gray-500">正在搜索附近餐厅...</p>
+        </div>
+      ) : restaurant ? (
+        <>
+          {/* 地图缩略图 */}
+          {restaurant.staticMapUrl && (
+            <div className="relative h-32 rounded-xl overflow-hidden bg-gray-200">
+              <img
+                src={restaurant.staticMapUrl}
+                alt="餐厅位置"
+                className="w-full h-full object-cover"
+                onError={(e) => {
+                  (e.target as HTMLImageElement).style.display = 'none';
+                }}
+              />
+              <div className="absolute top-2 right-2 bg-white px-2 py-1 rounded-full shadow text-xs font-bold text-orange-600">
+                {recommendation.cuisine}
+              </div>
+            </div>
+          )}
+
+          {/* 餐厅信息 */}
+          <div className="bg-white rounded-xl p-4 shadow-md space-y-3">
+            <div>
+              <h4 className="text-xl font-bold text-gray-800 mb-2">
+                {restaurant.name}
+              </h4>
+              <div className="flex items-center gap-2 text-sm flex-wrap">
+                <span className="text-yellow-500">⭐ {restaurant.rating}</span>
+                <span className="text-gray-400">|</span>
+                <span className="text-gray-600">{priceSymbols} ¥{restaurant.cost}</span>
+              </div>
+              <p className="text-xs text-gray-500 mt-1 line-clamp-1">{restaurant.address}</p>
+            </div>
+
+            {/* 推荐理由 */}
+            <div className="bg-orange-50 rounded-lg p-3">
+              <div className="flex items-start gap-2">
+                <span className="text-lg">💡</span>
+                <div className="flex-1">
+                  <p className="text-sm text-gray-700 leading-relaxed">{recommendation.reason}</p>
+                </div>
+              </div>
+            </div>
+
+            {/* 推荐菜品 */}
+            <div>
+              <h5 className="text-sm font-bold text-gray-800 mb-2 flex items-center gap-1">
+                <span>🍽️</span>
+                <span>推荐菜品</span>
+              </h5>
+              <div className="grid grid-cols-2 gap-2">
+                {recommendation.dishes.slice(0, 4).map((dish, i) => (
+                  <div
+                    key={i}
+                    className="px-3 py-2 bg-gradient-to-r from-orange-100 to-amber-100 rounded-lg text-center text-sm font-medium text-gray-700"
+                  >
+                    {dish}
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* 适合人群 */}
+            <div>
+              <h5 className="text-sm font-bold text-gray-800 mb-2 flex items-center gap-1">
+                <span>👥</span>
+                <span>适合</span>
+              </h5>
+              <div className="flex flex-wrap gap-2">
+                {recommendation.suitableFor.map((name, i) => (
+                  <span
+                    key={i}
+                    className={`px-3 py-1 rounded-full text-white text-xs font-medium bg-gradient-to-r ${getParticipantColor(i).bg}`}
+                  >
+                    {name}
+                  </span>
+                ))}
+              </div>
+            </div>
+
+            {/* 操作按钮 */}
+            <div className="flex gap-2 pt-2">
+              <a
+                href={`https://uri.amap.com/marker?position=${restaurant.location}&name=${encodeURIComponent(restaurant.name)}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex-1 px-4 py-2 bg-gradient-to-r from-orange-500 to-red-500 text-white rounded-xl text-sm font-bold text-center shadow hover:shadow-lg transition-all"
+              >
+                📍 导航
+              </a>
+              <button
+                onClick={() => {
+                  const text = `${restaurant.name}\n地址：${restaurant.address}\n评分：${restaurant.rating} ⭐\n人均：¥${restaurant.cost}`;
+                  navigator.clipboard.writeText(text);
+                  alert('餐厅信息已复制！');
+                }}
+                className="px-4 py-2 bg-white border-2 border-orange-500 text-orange-500 rounded-xl text-sm font-bold hover:bg-orange-50 transition-all"
+              >
+                📋
+              </button>
+            </div>
+          </div>
+        </>
+      ) : (
+        // 降级显示
+        <div className="bg-white rounded-xl p-4 shadow-md space-y-3">
+          <div>
+            <h4 className="text-xl font-bold text-gray-800 mb-2">
+              {recommendation.restaurantName}
+            </h4>
+            <div className="flex items-center gap-2 text-sm flex-wrap">
+              <span className="px-2 py-1 bg-orange-100 text-orange-700 rounded-full text-xs font-medium">
+                {recommendation.cuisine}
+              </span>
+              <span className="text-gray-600">{priceSymbols}</span>
+              {recommendation.rating && (
+                <>
+                  <span className="text-gray-400">|</span>
+                  <span className="text-yellow-500">⭐ {recommendation.rating}</span>
+                </>
+              )}
+            </div>
+          </div>
+
+          <div className="bg-orange-50 rounded-lg p-3">
+            <div className="flex items-start gap-2">
+              <span className="text-lg">💡</span>
+              <div className="flex-1">
+                <p className="text-sm text-gray-700 leading-relaxed">{recommendation.reason}</p>
+              </div>
+            </div>
+          </div>
+
+          <div>
+            <h5 className="text-sm font-bold text-gray-800 mb-2 flex items-center gap-1">
+              <span>🍽️</span>
+              <span>推荐菜品</span>
+            </h5>
+            <div className="grid grid-cols-2 gap-2">
+              {recommendation.dishes.slice(0, 4).map((dish, i) => (
+                <div
+                  key={i}
+                  className="px-3 py-2 bg-gradient-to-r from-orange-100 to-amber-100 rounded-lg text-center text-sm font-medium text-gray-700"
+                >
+                  {dish}
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div>
+            <h5 className="text-sm font-bold text-gray-800 mb-2 flex items-center gap-1">
+              <span>👥</span>
+              <span>适合</span>
+            </h5>
+            <div className="flex flex-wrap gap-2">
+              {recommendation.suitableFor.map((name, i) => (
+                <span
+                  key={i}
+                  className={`px-3 py-1 rounded-full text-white text-xs font-medium bg-gradient-to-r ${getParticipantColor(i).bg}`}
+                >
+                  {name}
+                </span>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// 全屏推荐结果组件
+function RecommendationResultFullScreen({
+  recommendation,
+  participants,
+  onViewDiscussion
+}: {
+  recommendation: RestaurantRecommendation;
+  participants: AvatarParticipant[];
+  onViewDiscussion: () => void;
+}) {
+  const [restaurant, setRestaurant] = useState<AmapRestaurantInfo | null>(null);
+  const [loading, setLoading] = useState(false);
+  const priceSymbols = '¥'.repeat(recommendation.priceLevel);
+
+  // 搜索高德地图餐厅
+  useEffect(() => {
+    const searchRestaurant = async () => {
+      setLoading(true);
+      try {
+        const response = await fetch('/api/amap/search', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            cuisine: recommendation.cuisine,
+            city: '北京'
+          }),
+        });
+
+        const result = await response.json();
+        if (result.code === 0 && result.data) {
+          setRestaurant(result.data);
+        }
+      } catch (error) {
+        console.error('搜索餐厅失败:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    searchRestaurant();
+  }, [recommendation.cuisine]);
+
+  return (
+    <div className="min-h-full bg-gradient-to-br from-orange-50 via-amber-50 to-yellow-50 p-6 animate-fade-in">
+      {/* 顶部返回按钮 */}
+      <div className="max-w-4xl mx-auto mb-6">
+        <button
+          onClick={onViewDiscussion}
+          className="flex items-center gap-2 px-4 py-2 bg-white rounded-full shadow-md hover:shadow-lg transition-all text-gray-700 hover:text-gray-900"
+        >
+          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+          </svg>
+          <span className="text-sm font-medium">返回分屏视图</span>
+        </button>
+      </div>
+
+      {/* 主内容 */}
+      <div className="max-w-4xl mx-auto space-y-6">
+        {/* 标题区 */}
+        <div className="text-center space-y-4">
+          <div className="inline-flex items-center gap-3 px-6 py-3 bg-gradient-to-r from-green-500 to-emerald-500 text-white rounded-full shadow-lg">
+            <span className="text-3xl">🎉</span>
+            <h2 className="text-2xl font-bold">AI 分身达成共识！</h2>
+            <span className="text-3xl">🎉</span>
+          </div>
+
+          <p className="text-gray-600 text-lg">
+            经过 {participants.length} 位 AI 分身的深入讨论，为您推荐最合适的餐厅
+          </p>
+        </div>
+
+        {/* 参与者头像列表 */}
+        <div className="flex justify-center items-center gap-3 flex-wrap">
+          {participants.map((p, i) => (
+            <div key={p.userId} className="flex flex-col items-center gap-1">
+              <div className={`w-14 h-14 rounded-full bg-gradient-to-br ${getParticipantColor(i).bg} flex items-center justify-center text-white text-xl font-bold shadow-lg ring-4 ring-white`}>
+                {p.userName[0]}
+              </div>
+              <span className="text-xs text-gray-600 font-medium">{p.userName}</span>
+            </div>
+          ))}
+        </div>
+
+        {/* 餐厅推荐卡片 */}
+        <div className="bg-white rounded-3xl shadow-2xl overflow-hidden">
+          {loading ? (
+            <div className="text-center py-16">
+              <div className="animate-spin rounded-full h-12 w-12 border-b-4 border-orange-500 mx-auto mb-4"></div>
+              <p className="text-gray-500">正在搜索附近餐厅...</p>
+            </div>
+          ) : restaurant ? (
+            <>
+              {/* 地图展示 */}
+              {restaurant.staticMapUrl && (
+                <div className="relative h-64 bg-gray-200">
+                  <img
+                    src={restaurant.staticMapUrl}
+                    alt="餐厅位置"
+                    className="w-full h-full object-cover"
+                    onError={(e) => {
+                      (e.target as HTMLImageElement).style.display = 'none';
+                    }}
+                  />
+                  <div className="absolute top-4 right-4 bg-white px-4 py-2 rounded-full shadow-lg">
+                    <span className="text-orange-600 font-bold">{recommendation.cuisine}</span>
+                  </div>
+                </div>
+              )}
+
+              {/* 餐厅信息 */}
+              <div className="p-8 space-y-6">
+                {/* 餐厅名称和评分 */}
+                <div>
+                  <h3 className="text-3xl font-bold text-gray-800 mb-3">
+                    {restaurant.name}
+                  </h3>
+                  <div className="flex items-center gap-4 flex-wrap">
+                    <div className="flex items-center gap-1">
+                      <span className="text-yellow-500 text-xl">⭐</span>
+                      <span className="text-lg font-semibold text-gray-700">{restaurant.rating}</span>
+                    </div>
+                    <div className="h-4 w-px bg-gray-300"></div>
+                    <span className="text-lg text-gray-600">人均 {priceSymbols} ¥{restaurant.cost}</span>
+                    <div className="h-4 w-px bg-gray-300"></div>
+                    <span className="text-gray-500">{restaurant.address}</span>
+                  </div>
+                </div>
+
+                {/* 推荐理由 */}
+                <div className="bg-gradient-to-r from-orange-50 to-amber-50 rounded-2xl p-6">
+                  <div className="flex items-start gap-3">
+                    <span className="text-2xl">💡</span>
+                    <div className="flex-1">
+                      <h4 className="font-bold text-gray-800 mb-2">推荐理由</h4>
+                      <p className="text-gray-700 leading-relaxed">{recommendation.reason}</p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* 推荐菜品 */}
+                <div>
+                  <h4 className="font-bold text-gray-800 mb-3 flex items-center gap-2">
+                    <span className="text-xl">🍽️</span>
+                    推荐菜品
+                  </h4>
+                  <div className="grid grid-cols-2 gap-3">
+                    {recommendation.dishes.map((dish, i) => (
+                      <div
+                        key={i}
+                        className="px-4 py-3 bg-gradient-to-r from-orange-100 to-amber-100 rounded-xl text-center font-medium text-gray-700 hover:shadow-md transition-shadow"
+                      >
+                        {dish}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* 适合人群 */}
+                <div>
+                  <h4 className="font-bold text-gray-800 mb-3 flex items-center gap-2">
+                    <span className="text-xl">👥</span>
+                    适合
+                  </h4>
+                  <div className="flex flex-wrap gap-2">
+                    {recommendation.suitableFor.map((name, i) => (
+                      <span
+                        key={i}
+                        className={`px-4 py-2 rounded-full text-white font-medium bg-gradient-to-r ${getParticipantColor(i).bg}`}
+                      >
+                        {name}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+
+                {/* 操作按钮 */}
+                <div className="flex gap-3 pt-4">
+                  <a
+                    href={`https://uri.amap.com/marker?position=${restaurant.location}&name=${encodeURIComponent(restaurant.name)}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex-1 px-6 py-4 bg-gradient-to-r from-orange-500 to-red-500 text-white rounded-2xl font-bold text-center shadow-lg hover:shadow-xl transition-all transform hover:scale-105"
+                  >
+                    📍 高德地图导航
+                  </a>
+                  <button
+                    onClick={() => {
+                      // 复制餐厅信息
+                      const text = `${restaurant.name}\n地址：${restaurant.address}\n评分：${restaurant.rating} ⭐\n人均：¥${restaurant.cost}`;
+                      navigator.clipboard.writeText(text);
+                      alert('餐厅信息已复制到剪贴板！');
+                    }}
+                    className="px-6 py-4 bg-white border-2 border-orange-500 text-orange-500 rounded-2xl font-bold hover:bg-orange-50 transition-all"
+                  >
+                    📋 复制信息
+                  </button>
+                </div>
+              </div>
+            </>
+          ) : (
+            // 降级显示（无高德地图数据）
+            <div className="p-8 space-y-6">
+              <div>
+                <h3 className="text-3xl font-bold text-gray-800 mb-3">
+                  {recommendation.restaurantName}
+                </h3>
+                <div className="flex items-center gap-4 flex-wrap">
+                  <span className="px-3 py-1 bg-orange-100 text-orange-700 rounded-full text-sm font-medium">
+                    {recommendation.cuisine}
+                  </span>
+                  <span className="text-lg text-gray-600">人均 {priceSymbols}</span>
+                  {recommendation.rating && (
+                    <>
+                      <div className="h-4 w-px bg-gray-300"></div>
+                      <div className="flex items-center gap-1">
+                        <span className="text-yellow-500">⭐</span>
+                        <span className="font-semibold">{recommendation.rating}</span>
+                      </div>
+                    </>
+                  )}
+                </div>
+              </div>
+
+              <div className="bg-gradient-to-r from-orange-50 to-amber-50 rounded-2xl p-6">
+                <div className="flex items-start gap-3">
+                  <span className="text-2xl">💡</span>
+                  <div className="flex-1">
+                    <h4 className="font-bold text-gray-800 mb-2">推荐理由</h4>
+                    <p className="text-gray-700 leading-relaxed">{recommendation.reason}</p>
+                  </div>
+                </div>
+              </div>
+
+              <div>
+                <h4 className="font-bold text-gray-800 mb-3 flex items-center gap-2">
+                  <span className="text-xl">🍽️</span>
+                  推荐菜品
+                </h4>
+                <div className="grid grid-cols-2 gap-3">
+                  {recommendation.dishes.map((dish, i) => (
+                    <div
+                      key={i}
+                      className="px-4 py-3 bg-gradient-to-r from-orange-100 to-amber-100 rounded-xl text-center font-medium text-gray-700"
+                    >
+                      {dish}
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <h4 className="font-bold text-gray-800 mb-3 flex items-center gap-2">
+                  <span className="text-xl">👥</span>
+                  适合
+                </h4>
+                <div className="flex flex-wrap gap-2">
+                  {recommendation.suitableFor.map((name, i) => (
+                    <span
+                      key={i}
+                      className={`px-4 py-2 rounded-full text-white font-medium bg-gradient-to-r ${getParticipantColor(i).bg}`}
+                    >
+                      {name}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// 推荐结果组件（原来的底部卡片版本，保留作为备用）
 function RecommendationResult({ recommendation }: { recommendation: RestaurantRecommendation }) {
   const [restaurant, setRestaurant] = useState<AmapRestaurantInfo | null>(null);
   const [loading, setLoading] = useState(false);
