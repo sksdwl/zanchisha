@@ -1,9 +1,8 @@
 /**
- * 房间消息 KV 存储
- * 用于存储和同步讨论消息
+ * 房间消息内存存储
+ * 用于存储和同步讨论消息（内存实现，无需 Redis）
  */
 
-import { kv } from '@vercel/kv';
 import { AvatarMessage, RestaurantRecommendation } from './ai-avatar-chat';
 
 export interface RoomMessages {
@@ -14,6 +13,25 @@ export interface RoomMessages {
   createdAt: number;
   updatedAt: number;
 }
+
+// 内存存储
+const memoryStore = new Map<string, RoomMessages>();
+
+// 自动清理过期数据（1小时后）
+const EXPIRY_TIME = 3600 * 1000; // 1小时
+
+function cleanupExpiredRooms() {
+  const now = Date.now();
+  for (const [key, data] of memoryStore.entries()) {
+    if (now - data.updatedAt > EXPIRY_TIME) {
+      memoryStore.delete(key);
+      console.log(`[RoomMessagesMemory] 自动清理过期房间: ${data.inviteCode}`);
+    }
+  }
+}
+
+// 每10分钟清理一次过期数据
+setInterval(cleanupExpiredRooms, 10 * 60 * 1000);
 
 class RoomMessagesKV {
   private getKey(inviteCode: string): string {
@@ -33,8 +51,8 @@ class RoomMessagesKV {
       updatedAt: Date.now(),
     };
 
-    await kv.set(key, JSON.stringify(data), { ex: 3600 }); // 1小时过期
-    console.log(`[RoomMessagesKV] 初始化房间消息: ${inviteCode}`);
+    memoryStore.set(key, data);
+    console.log(`[RoomMessagesMemory] 初始化房间消息: ${inviteCode}`);
   }
 
   /**
@@ -42,26 +60,19 @@ class RoomMessagesKV {
    */
   async addMessage(inviteCode: string, message: AvatarMessage): Promise<void> {
     const key = this.getKey(inviteCode);
-    const dataStr = await kv.get<string>(key);
+    let data = memoryStore.get(key);
 
-    if (!dataStr) {
-      console.warn(`[RoomMessagesKV] 房间不存在，先初始化: ${inviteCode}`);
+    if (!data) {
+      console.warn(`[RoomMessagesMemory] 房间不存在，先初始化: ${inviteCode}`);
       await this.init(inviteCode);
+      data = memoryStore.get(key)!;
     }
-
-    const data: RoomMessages = dataStr ? JSON.parse(dataStr) : {
-      inviteCode,
-      messages: [],
-      status: 'ongoing',
-      createdAt: Date.now(),
-      updatedAt: Date.now(),
-    };
 
     data.messages.push(message);
     data.updatedAt = Date.now();
 
-    await kv.set(key, JSON.stringify(data), { ex: 3600 });
-    console.log(`[RoomMessagesKV] 添加消息: ${inviteCode}, 总数: ${data.messages.length}`);
+    memoryStore.set(key, data);
+    console.log(`[RoomMessagesMemory] 添加消息: ${inviteCode}, 总数: ${data.messages.length}`);
   }
 
   /**
@@ -69,19 +80,18 @@ class RoomMessagesKV {
    */
   async setRecommendation(inviteCode: string, recommendation: RestaurantRecommendation): Promise<void> {
     const key = this.getKey(inviteCode);
-    const dataStr = await kv.get<string>(key);
+    const data = memoryStore.get(key);
 
-    if (!dataStr) {
-      console.warn(`[RoomMessagesKV] 房间不存在: ${inviteCode}`);
+    if (!data) {
+      console.warn(`[RoomMessagesMemory] 房间不存在: ${inviteCode}`);
       return;
     }
 
-    const data: RoomMessages = JSON.parse(dataStr);
     data.recommendation = recommendation;
     data.updatedAt = Date.now();
 
-    await kv.set(key, JSON.stringify(data), { ex: 3600 });
-    console.log(`[RoomMessagesKV] 设置推荐结果: ${inviteCode}`);
+    memoryStore.set(key, data);
+    console.log(`[RoomMessagesMemory] 设置推荐结果: ${inviteCode}`);
   }
 
   /**
@@ -89,19 +99,18 @@ class RoomMessagesKV {
    */
   async markCompleted(inviteCode: string): Promise<void> {
     const key = this.getKey(inviteCode);
-    const dataStr = await kv.get<string>(key);
+    const data = memoryStore.get(key);
 
-    if (!dataStr) {
-      console.warn(`[RoomMessagesKV] 房间不存在: ${inviteCode}`);
+    if (!data) {
+      console.warn(`[RoomMessagesMemory] 房间不存在: ${inviteCode}`);
       return;
     }
 
-    const data: RoomMessages = JSON.parse(dataStr);
     data.status = 'completed';
     data.updatedAt = Date.now();
 
-    await kv.set(key, JSON.stringify(data), { ex: 3600 });
-    console.log(`[RoomMessagesKV] 标记完成: ${inviteCode}`);
+    memoryStore.set(key, data);
+    console.log(`[RoomMessagesMemory] 标记完成: ${inviteCode}`);
   }
 
   /**
@@ -109,13 +118,13 @@ class RoomMessagesKV {
    */
   async getMessages(inviteCode: string): Promise<RoomMessages | null> {
     const key = this.getKey(inviteCode);
-    const dataStr = await kv.get<string>(key);
+    const data = memoryStore.get(key);
 
-    if (!dataStr) {
+    if (!data) {
       return null;
     }
 
-    return JSON.parse(dataStr);
+    return data;
   }
 
   /**
@@ -123,8 +132,8 @@ class RoomMessagesKV {
    */
   async deleteMessages(inviteCode: string): Promise<void> {
     const key = this.getKey(inviteCode);
-    await kv.del(key);
-    console.log(`[RoomMessagesKV] 删除房间消息: ${inviteCode}`);
+    memoryStore.delete(key);
+    console.log(`[RoomMessagesMemory] 删除房间消息: ${inviteCode}`);
   }
 }
 
